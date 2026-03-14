@@ -1,0 +1,270 @@
+import React, { useState, useCallback } from 'react';
+import MapView from './components/MapView';
+import FilterBar from './components/FilterBar';
+import PropertyList from './components/PropertyList';
+import PropertyDrawer from './components/PropertyDrawer';
+import RoutePanel from './components/RoutePanel';
+import PropertyEditModal from './components/PropertyEditModal';
+import { useProperties } from './hooks/useProperties';
+import { Building2, RefreshCw, Route, X } from 'lucide-react';
+
+function StatBadge({ label, value, color }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`text-lg font-bold ${color}`}>{value}</span>
+      <span className="text-slate-400 text-xs">{label}</span>
+    </div>
+  );
+}
+
+function App() {
+  const {
+    filteredProperties,
+    properties,
+    loading,
+    error,
+    filters,
+    zones,
+    updateFilter,
+    resetFilters,
+    connectGoogle,
+    disconnectGoogle,
+    googleUser,
+    googleToken,
+    sheetMeta,
+    geocoding,
+    updateProperty,
+    completeProperty,
+    uncompleteProperty,
+    routeSelection,
+    toggleRouteSelection,
+    clearRouteSelection,
+    routeResult,
+  } = useProperties();
+
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [routeMode, setRouteMode] = useState(false);
+  const [editingProperty, setEditingProperty] = useState(null);
+
+  const handleSelectProperty = useCallback((prop) => {
+    setSelectedProperty(prop);
+    setIsDrawerOpen(true);
+  }, []);
+
+  const handleCloseDrawer = useCallback(() => {
+    setIsDrawerOpen(false);
+  }, []);
+
+  const handleToggleRouteMode = useCallback(() => {
+    setRouteMode((v) => {
+      if (v) clearRouteSelection();
+      return !v;
+    });
+  }, [clearRouteSelection]);
+
+  const handleEditProperty = useCallback((prop) => {
+    setEditingProperty(prop);
+    setIsDrawerOpen(false);
+  }, []);
+
+  const handleSaveEdit = useCallback(async (id, patch) => {
+    await updateProperty(id, patch);
+    setEditingProperty(null);
+  }, [updateProperty]);
+
+  return (
+    <div className="flex flex-col h-screen w-full bg-slate-100 overflow-hidden">
+
+      {/* 글로벌 헤더 */}
+      <header className="flex items-center justify-between px-5 py-3 bg-slate-900 text-white flex-shrink-0 shadow-lg z-30">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+            <Building2 size={18} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-base font-bold leading-tight">부동산 매물 관리</h1>
+            <p className="text-xs text-slate-400 leading-tight">상가 임대 · 매매 현황</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* 통계 배지 */}
+          <div className="hidden sm:flex items-center gap-4 text-sm">
+            <StatBadge label="전체" value={properties.length} color="text-slate-300" />
+            <StatBadge label="공실" value={properties.filter((p) => p.isVacant && !p.isCompleted).length} color="text-green-400" />
+            <StatBadge label="임대" value={properties.filter((p) => p.type === '임대' && !p.isCompleted).length} color="text-blue-400" />
+            <StatBadge label="매매" value={properties.filter((p) => p.type === '매매' && !p.isCompleted).length} color="text-rose-400" />
+          </div>
+
+          {/* 경로 최적화 모드 토글 */}
+          <button
+            onClick={handleToggleRouteMode}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition border
+              ${routeMode
+                ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-500/30'
+                : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+              }`}
+          >
+            <Route size={15} />
+            경로 최적화
+            {routeMode && routeSelection.length > 0 && (
+              <span className="ml-1 bg-white/30 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                {routeSelection.length}
+              </span>
+            )}
+          </button>
+
+          {/* 지오코딩 진행 표시 */}
+          {geocoding.running && (
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/20">
+              <RefreshCw size={12} className="animate-spin" />
+              좌표 변환 {geocoding.done}/{geocoding.total}
+            </div>
+          )}
+
+          {/* Google 연동 버튼 */}
+          {googleUser ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                  G
+                </div>
+                <span className="text-xs text-slate-200 max-w-24 truncate hidden lg:block">{googleUser.email}</span>
+              </div>
+              <button
+                onClick={disconnectGoogle}
+                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs border border-white/20 transition"
+              >
+                로그아웃
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={async () => { try { await connectGoogle(); } catch (e) {} }}
+              className="px-3 py-1.5 bg-white text-slate-900 hover:bg-slate-100 rounded-lg text-sm font-semibold transition"
+            >
+              구글 연동
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* 경로 모드 배너 */}
+      {routeMode && (
+        <div className="bg-purple-700 text-white px-5 py-2 flex items-center justify-between text-sm flex-shrink-0 z-20">
+          <span className="flex items-center gap-2">
+            <Route size={15} />
+            <strong>경로 최적화 모드</strong>
+            <span className="text-purple-200">— 지도 또는 목록에서 최대 5개 물건을 선택하세요</span>
+          </span>
+          <button
+            onClick={handleToggleRouteMode}
+            className="p-1 rounded-full hover:bg-purple-600 transition"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* 메인 콘텐츠 */}
+      <main className="flex flex-1 overflow-hidden flex-col md:flex-row">
+
+        {/* 좌측: 카카오맵 */}
+        <section className="md:w-1/2 w-full md:h-full h-[45vh] flex-shrink-0 relative md:border-r border-slate-300 flex flex-col">
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center bg-slate-100">
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-slate-500 text-sm">데이터를 불러오는 중...</p>
+              </div>
+            </div>
+          ) : (
+            <MapView
+              properties={filteredProperties}
+              selectedId={selectedProperty?.id}
+              onSelectProperty={handleSelectProperty}
+              routeOrder={routeResult?.route}
+              routeMode={routeMode}
+              routeSelection={routeSelection}
+              onToggleRoute={toggleRouteSelection}
+            />
+          )}
+
+          {/* 범례 */}
+          {!loading && (
+            <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg px-3 py-2 text-xs border border-slate-200 z-10">
+              <p className="font-semibold text-slate-600 mb-1.5">범례</p>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-1.5"><div className="w-4 h-4 bg-blue-600 rounded-sm" /><span className="text-slate-600">임대</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-4 h-4 bg-rose-600 rounded-sm" /><span className="text-slate-600">매매</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-green-400 rounded-full border border-green-600" /><span className="text-slate-600">공실</span></div>
+                {routeMode && <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-purple-500 rounded-full" /><span className="text-slate-600">경로 선택</span></div>}
+              </div>
+            </div>
+          )}
+
+          {/* 경로 패널 (지도 하단에 오버레이) */}
+          {routeMode && (
+            <div className="absolute bottom-0 left-0 right-0 z-20 max-h-72 overflow-y-auto">
+              <RoutePanel
+                properties={properties}
+                routeSelection={routeSelection}
+                routeResult={routeResult}
+                onToggleRoute={toggleRouteSelection}
+                onClear={clearRouteSelection}
+                onClose={handleToggleRouteMode}
+              />
+            </div>
+          )}
+        </section>
+
+        {/* 우측: 필터 + 매물 리스트 */}
+        <section className="md:w-1/2 w-full h-full flex flex-col overflow-hidden bg-white" aria-label="매물 목록 영역">
+          <FilterBar
+            filters={filters}
+            onUpdate={updateFilter}
+            onReset={resetFilters}
+            totalCount={properties.filter(p => !p.isCompleted).length}
+            filteredCount={filteredProperties.length}
+            zones={zones}
+          />
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <PropertyList
+              properties={filteredProperties}
+              selectedId={selectedProperty?.id}
+              onSelectProperty={handleSelectProperty}
+              routeMode={routeMode}
+              routeSelection={routeSelection}
+              onToggleRoute={toggleRouteSelection}
+            />
+          </div>
+        </section>
+      </main>
+
+      {/* 상세 정보 드로어 */}
+      {isDrawerOpen && selectedProperty && (
+        <PropertyDrawer
+          property={selectedProperty}
+          onClose={handleCloseDrawer}
+          onEdit={handleEditProperty}
+          onComplete={completeProperty}
+          onUncomplete={uncompleteProperty}
+        />
+      )}
+
+      {/* 수정 모달 */}
+      {editingProperty && (
+        <PropertyEditModal
+          property={editingProperty}
+          onSave={handleSaveEdit}
+          onClose={() => setEditingProperty(null)}
+          sheetMeta={sheetMeta}
+          googleToken={googleToken}
+        />
+      )}
+    </div>
+  );
+}
+
+export default App;

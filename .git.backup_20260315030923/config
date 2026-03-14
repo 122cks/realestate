@@ -1,0 +1,13 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+[user]
+	email = dev@local
+	name = real-estate-bot
+[remote "origin"]
+	url = https://github.com/<USERNAME>/<REPO>.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
