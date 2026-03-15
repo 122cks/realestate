@@ -62,79 +62,67 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
   return (
     <div className="bg-white border-b border-slate-200 shadow-sm">
       {/* 메인 검색 바 */}
-      <div className="px-4 py-3 flex items-center gap-2">
-        {/* 통합 검색 */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-          <input
-            type="text"
-            placeholder="구역, 상호명, 주소, 건물명 검색..."
-            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-            value={localSearch}
-            onChange={handleSearchChange}
-          />
+      <div className="px-3 py-2 flex flex-col gap-1.5">
+        {/* 행 1: 검색 입력 + 액션 버튼 */}
+        <div className="flex items-center gap-1.5">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+            <input
+              type="text"
+              placeholder="구역·상호·주소 검색..."
+              className="w-full pl-8 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              value={localSearch}
+              onChange={handleSearchChange}
+            />
+          </div>
+
+          {/* 상세 필터 토글 */}
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={`flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-lg border transition flex-shrink-0
+              ${isExpanded ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+          >
+            <SlidersHorizontal size={15} />
+            <span className="hidden sm:inline">상세</span>
+            {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+
+          {/* 초기화 */}
+          <button onClick={onReset} className="p-2 text-slate-500 hover:text-slate-800 border border-slate-300 rounded-lg hover:bg-slate-50 transition flex-shrink-0" title="필터 초기화">
+            <RotateCcw size={15} />
+          </button>
+
+          {/* CSV */}
+          {onExportCSV && (
+            <button onClick={onExportCSV} className="flex items-center gap-1 px-2 py-2 text-xs text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 transition font-medium flex-shrink-0" title="CSV 내보내기">
+              <Download size={14} />
+              <span className="hidden sm:inline">CSV</span>
+            </button>
+          )}
         </div>
 
-        {/* 구역 드롭다운 */}
-        <select
-          className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition"
-          value={filters.zone}
-          onChange={(e) => onUpdate('zone', e.target.value)}
-        >
-          {zoneOptions.map((z) => (
-            <option key={z} value={z}>{z}</option>
-          ))}
-        </select>
-
-        {/* 담당자 드롭다운 */}
-        {managerOptions.length > 1 && (
+        {/* 행 2 (모바일): 구역 + 담당자 드롭다운 */}
+        <div className="flex items-center gap-1.5">
           <select
-            className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition"
-            value={filters.manager || '\uc804체'}
-            onChange={(e) => onUpdate('manager', e.target.value)}
+            className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition"
+            value={filters.zone}
+            onChange={(e) => onUpdate('zone', e.target.value)}
           >
-            {managerOptions.map((m) => (
-              <option key={m} value={m}>{m === '\uc804체' ? '\ub2f4당 \uc804체' : `\ub2f4당: ${m}`}</option>
-            ))}
+            {zoneOptions.map((z) => <option key={z} value={z}>{z}</option>)}
           </select>
-        )}
 
-        {/* (유형 드롭다운 제거 — 하단 버튼 그룹으로 대체) */}
-
-        {/* 상세 필터 토글 */}
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border transition
-            ${isExpanded
-              ? 'bg-blue-50 border-blue-300 text-blue-700'
-              : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-        >
-          <SlidersHorizontal size={16} />
-          상세
-          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-
-        {/* 초기화 버튼 */}
-        <button
-          onClick={onReset}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-500 hover:text-slate-800 border border-slate-300 rounded-lg hover:bg-slate-50 transition"
-          title="필터 초기화"
-        >
-          <RotateCcw size={15} />
-        </button>
-
-        {/* CSV 내보내기 */}
-        {onExportCSV && (
-          <button
-            onClick={onExportCSV}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 transition font-medium"
-            title="필터된 목록 CSV 내보내기"
-          >
-            <Download size={15} />
-            CSV
-          </button>
-        )}
+          {managerOptions.length > 1 && (
+            <select
+              className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition"
+              value={filters.manager || '전체'}
+              onChange={(e) => onUpdate('manager', e.target.value)}
+            >
+              {managerOptions.map((m) => (
+                <option key={m} value={m}>{m === '전체' ? '담당 전체' : `담당: ${m}`}</option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
 
       {/* 빠른 필터 토글 행 */}
@@ -171,7 +159,7 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
       {/* 상세 필터 패널 (접기/펼치기) */}
       {isExpanded && (
         <div className="px-4 pb-4 border-t border-slate-100 pt-3 bg-slate-50">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {/* 보증금 범위 */}
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">

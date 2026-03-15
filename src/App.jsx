@@ -6,7 +6,7 @@ import PropertyDrawer from './components/PropertyDrawer';
 import RoutePanel from './components/RoutePanel';
 import PropertyEditModal from './components/PropertyEditModal';
 import { useProperties } from './hooks/useProperties';
-import { Building2, RefreshCw, Route, X, BarChart2 } from 'lucide-react';
+import { Building2, RefreshCw, Route, X, BarChart2, MapIcon, LayoutList } from 'lucide-react';
 
 // 통계 패널은 사용할 때만 로드 (Recharts가 크므로 코드 분할)
 const StatsPanel = lazy(() => import('./components/StatsPanel'));
@@ -51,6 +51,7 @@ function App() {
   const [routeMode, setRouteMode] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
   const [isStatsPanelOpen, setIsStatsPanelOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState('list'); // 'map' | 'list'
 
   // Esc 키로 drawer/modal 닫기
   useEffect(() => {
@@ -138,7 +139,7 @@ function App() {
           {/* 통계 대시보드 버튼 */}
           <button
             onClick={() => setIsStatsPanelOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition border bg-white/10 border-white/20 text-white hover:bg-white/20"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition border bg-white/10 border-white/20 text-white hover:bg-white/20"
             title="통계 대시보드"
           >
             <BarChart2 size={15} />
@@ -148,14 +149,14 @@ function App() {
           {/* 경로 최적화 모드 토글 */}
           <button
             onClick={handleToggleRouteMode}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition border
+            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition border
               ${routeMode
                 ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-500/30'
                 : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
               }`}
           >
             <Route size={15} />
-            경로 최적화
+            <span className="hidden lg:inline">경로 최적화</span>
             {routeMode && routeSelection.length > 0 && (
               <span className="ml-1 bg-white/30 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
                 {routeSelection.length}
@@ -224,10 +225,10 @@ function App() {
       )}
 
       {/* 메인 콘텐츠 */}
-      <main className="flex flex-1 overflow-hidden flex-col md:flex-row">
+      <main className="flex flex-1 overflow-hidden flex-col md:flex-row pb-14 md:pb-0">
 
         {/* 좌측: 카카오맵 */}
-        <section className="md:w-1/2 w-full md:h-full h-[45vh] flex-shrink-0 relative md:border-r border-slate-300 flex flex-col">
+        <section className={`${mobileTab === 'map' ? 'flex' : 'hidden'} md:flex flex-col md:w-1/2 w-full md:h-full h-full flex-shrink-0 relative md:border-r border-slate-300`}>
           {loading ? (
             <div className="flex-1 flex items-center justify-center bg-slate-100">
               <div className="text-center">
@@ -277,7 +278,7 @@ function App() {
         </section>
 
         {/* 우측: 필터 + 매물 리스트 */}
-        <section className="md:w-1/2 w-full h-full flex flex-col overflow-hidden bg-white" aria-label="매물 목록 영역">
+        <section className={`${mobileTab === 'list' ? 'flex' : 'hidden'} md:flex flex-col md:w-1/2 w-full h-full overflow-hidden bg-white`} aria-label="매물 목록 영역">
           <FilterBar
             filters={filters}
             onUpdate={updateFilter}
@@ -332,6 +333,41 @@ function App() {
           googleToken={googleToken}
         />
       )}
+
+      {/* 모바일 하단 네비게이션 */}
+      <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-slate-200 shadow-lg z-40 flex safe-area-bottom">
+        <button
+          onClick={() => setMobileTab('map')}
+          className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition
+            ${mobileTab === 'map' ? 'text-blue-600' : 'text-slate-500'}`}
+        >
+          <MapIcon size={20} />
+          지도
+        </button>
+        <button
+          onClick={() => setMobileTab('list')}
+          className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition
+            ${mobileTab === 'list' ? 'text-blue-600' : 'text-slate-500'}`}
+        >
+          <LayoutList size={20} />
+          목록
+        </button>
+        <button
+          onClick={() => setIsStatsPanelOpen(true)}
+          className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium text-slate-500 hover:text-blue-600 transition"
+        >
+          <BarChart2 size={20} />
+          통계
+        </button>
+        <button
+          onClick={handleToggleRouteMode}
+          className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition
+            ${routeMode ? 'text-purple-600' : 'text-slate-500 hover:text-purple-600'}`}
+        >
+          <Route size={20} />
+          경로{routeMode && routeSelection.length > 0 ? ` (${routeSelection.length})` : ''}
+        </button>
+      </nav>
     </div>
   );
 }
