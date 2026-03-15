@@ -53,6 +53,7 @@ function App() {
   const [isStatsPanelOpen, setIsStatsPanelOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState('list'); // 'map' | 'list'
   const [mapVisibleIds, setMapVisibleIds] = useState(null); // Set<id> | null
+  const [buildInfo, setBuildInfo] = useState(null);
 
   // 모바일 하단 시트 드래그
   const SNAP_COLLAPSED = 60;
@@ -104,6 +105,20 @@ function App() {
   const viewportProps = mapVisibleIds
     ? filteredProperties.filter(p => mapVisibleIds.has(p.id))
     : filteredProperties;
+
+  useEffect(() => {
+    let mounted = true;
+    fetch('/build-info.json')
+      .then(r => { if (!r.ok) throw new Error('no build info'); return r.json(); })
+      .then(data => { if (mounted) setBuildInfo(data); })
+      .catch(() => {
+        // fallback to package.json version (dev)
+        try {
+          import('../package.json').then(m => { if (mounted) setBuildInfo({ version: m.version }); }).catch(() => {});
+        } catch (e) { /* ignore */ }
+      });
+    return () => { mounted = false; };
+  }, []);
 
   // Esc 키로 drawer/modal 닫기
   useEffect(() => {
@@ -256,6 +271,15 @@ function App() {
               구글 연동
             </button>
           )}
+
+          {/* 빌드 정보 표시 (배포된 경우 public/build-info.json에서 읽음) */}
+          <div className="hidden sm:flex items-center text-xs text-slate-300 ml-3">
+            {buildInfo ? (
+              <span title={`${buildInfo.gitSha || ''} ${buildInfo.time || ''}`}>v{buildInfo.version || '—'}{buildInfo.gitSha ? ` · ${buildInfo.gitSha}` : ''}</span>
+            ) : (
+              <span className="text-slate-500">버전 정보 없음</span>
+            )}
+          </div>
         </div>
       </header>
 

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/generate-build-info.cjs && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
