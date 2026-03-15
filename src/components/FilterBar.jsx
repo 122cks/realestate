@@ -159,7 +159,7 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
       </div>
 
       {/* 지역 필터 버튼 행 */}
-      <div className="px-3 pb-2 flex items-center gap-1.5 overflow-x-auto flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
+      <div className="px-3 pb-2 flex items-center gap-1.5 flex-wrap">
         <span className="text-xs text-slate-400 flex-shrink-0 mr-0.5">시도</span>
         {(() => {
           const opts = ['전체', '인천시', '부천시', '부평구', '계양구', '서구'];
@@ -188,7 +188,7 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
 
       {/* 동 필터 버튼 행 (선택된 지역에 동이 있는 경우만 표시) */}
       {dongs && dongs.length > 0 && (
-        <div className="px-3 pb-2 flex items-center gap-1.5 overflow-x-auto flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
+        <div className="px-3 pb-2 flex items-center gap-1.5 flex-wrap">
           <span className="text-xs text-slate-400 flex-shrink-0 mr-0.5">동</span>
           {['전체', ...dongs].map((d) => {
             const selectedD = Array.isArray(filters.dong) ? filters.dong : [filters.dong || '전체'];
@@ -215,7 +215,7 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
 
       {/* 상태 필터 버튼 행 */}
       {states && states.length > 0 && (
-        <div className="px-3 pb-2 flex items-center gap-1.5 overflow-x-auto flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
+        <div className="px-3 pb-2 flex items-center gap-1.5 flex-wrap">
           <span className="text-xs text-slate-400 flex-shrink-0 mr-0.5">상태</span>
           {states.map((s) => {
             const selectedS = Array.isArray(filters.state) ? filters.state : [filters.state || '전체'];

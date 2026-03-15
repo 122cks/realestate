@@ -437,7 +437,7 @@ function App() {
         </section>
 
         {/* 우측: 필터 + 매물 리스트 (Desktop only) */}
-        <section className="hidden md:flex flex-col w-full md:w-96 h-full overflow-hidden bg-white" aria-label="매물 목록 영역">
+        <section className="hidden md:flex flex-col w-full md:w-[420px] h-full overflow-hidden bg-white" aria-label="매물 목록 영역">
           <FilterBar
             filters={filters}
             onUpdate={updateFilter}

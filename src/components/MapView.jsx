@@ -26,6 +26,16 @@ export default function MapView({
   const [openPopupId, setOpenPopupId] = useState(null);
   const [hoverPopupId, setHoverPopupId] = useState(null);
 
+  // 팝업 이벤트 위임에 사용할 최신값 refs (innerHTML 교체 후에도 안전하게 호출)
+  const openPopupIdRef      = useRef(null);
+  const hoverPopupIdRef     = useRef(null);
+  const onSelectPropertyRef = useRef(null);
+  // 렌더마다 동기화 — stale closure 없이 항상 최신값
+  openPopupIdRef.current      = openPopupId;
+  hoverPopupIdRef.current     = hoverPopupId;
+  onSelectPropertyRef.current = onSelectProperty;
+  propsRef.current            = properties; // useEffect보다 빠른 동기 갱신
+
   const {
     map,
     mapRef: kakaoMapRef,
@@ -187,7 +197,34 @@ export default function MapView({
     }
   }, [selectedId, properties, map]);
 
-  // 팝업 오버레이 — 마커 클릭 → 썸네일 → 상세정보보기 클릭 → 바로 드로어 열기
+  // ── 팝업 버튼 이벤트 위임 ──────────────────────────────────────────────
+  // innerHTML이 리셋되어도 컨테이너의 리스너는 유지되므로 버튼이 항상 반응함
+  useEffect(() => {
+    const container = popupContainerRef.current;
+    if (!container || !map) return;
+    const handle = (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      e.stopPropagation();
+      const action = btn.dataset.action;
+      if (action === 'close') {
+        setOpenPopupId(null); setHoverPopupId(null);
+      } else if (action === 'detail') {
+        const id = openPopupIdRef.current || hoverPopupIdRef.current;
+        const prop = propsRef.current.find(p => p.id === id);
+        if (prop) {
+          try { onSelectPropertyRef.current?.(prop, { modal: true }); } catch { /**/ }
+          try { window.dispatchEvent(new CustomEvent('openPropertyModal', { detail: { property: prop } })); } catch { /**/ }
+        }
+        setOpenPopupId(null); setHoverPopupId(null);
+      }
+    };
+    container.addEventListener('click', handle);
+    return () => container.removeEventListener('click', handle);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]); // map 준비 완료 시 1회 설정
+
+  // 팝업 오버레이 — 내용만 갱신 (버튼 이벤트는 위임으로 처리)
   useEffect(() => {
     const popup     = popupOverlayRef.current;
     const container = popupContainerRef.current;
@@ -197,25 +234,9 @@ export default function MapView({
     const prop = properties.find(p => p.id === activeId);
     if (!prop || !Number.isFinite(prop.lat)) { popup.setMap(null); return; }
     container.innerHTML = buildThumbnailHTML(prop);
-    container.querySelector('[data-action="close"]')?.addEventListener('click', e => {
-      e.stopPropagation(); setOpenPopupId(null); setHoverPopupId(null);
-    });
-    const detailBtn = container.querySelector('[data-action="detail"]');
-    detailBtn?.addEventListener('click', e => {
-      e.stopPropagation();
-      try {
-        if (typeof onSelectProperty === 'function') onSelectProperty(prop, { modal: true });
-      } catch (err) { console.warn('[MapView] onSelectProperty threw', err); }
-      // 안전망: React 콜백이 동작하지 않는 환경 대비 전역 이벤트로도 모달 요청 발행
-      try {
-        window.dispatchEvent(new CustomEvent('openPropertyModal', { detail: { property: prop } }));
-      } catch { /* ignore */ }
-      setOpenPopupId(null);
-      setHoverPopupId(null);
-    });
     popup.setPosition(new window.kakao.maps.LatLng(prop.lat, prop.lng));
     popup.setMap(map);
-  }, [openPopupId, hoverPopupId, properties, onSelectProperty, map, popupContainerRef, popupOverlayRef]);
+  }, [openPopupId, hoverPopupId, properties, map, popupContainerRef, popupOverlayRef]);
 
   // 경로 폴리라인
   useEffect(() => {
