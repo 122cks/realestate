@@ -9,6 +9,9 @@ on:
   workflow_dispatch:
     # GitHub Actions 탭에서 수동 배포 트리거 가능
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
