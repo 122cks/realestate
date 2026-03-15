@@ -699,12 +699,40 @@ export function useProperties() {
   const updateFilter = useCallback((key, value) => {
     setFilters((prev) => {
       let next = { ...prev, [key]: value };
-      // 지역(region) 변경 시 동(dong) 필터 초기화
-      if (key === 'region') next = { ...next, dong: '전체' };
+      // region 변경 시: 이전에 선택된 dong이 새 region에 속하면 유지,
+      // 그렇지 않으면 '전체'로 초기화합니다.
+      if (key === 'region') {
+        const region = value || '전체';
+        const allDongSet = new Set(properties.map((p) => p.dong).filter(Boolean));
+        let filtered;
+        if (region === '전체') {
+          filtered = Array.from(allDongSet);
+        } else if (region === '부천시') {
+          filtered = Array.from(allDongSet).filter(d => BUCHEON_DONGS.has(d));
+        } else if (region === '인천시') {
+          filtered = Array.from(allDongSet).filter(d =>
+            !BUCHEON_DONGS.has(d) && !BUPYEONG_DONGS.has(d) && !GYEYANG_DONGS.has(d) && !SEO_DONGS.has(d)
+          );
+        } else if (region === '부평구') {
+          filtered = Array.from(allDongSet).filter(d => BUPYEONG_DONGS.has(d));
+        } else if (region === '계양구') {
+          filtered = Array.from(allDongSet).filter(d => GYEYANG_DONGS.has(d));
+        } else if (region === '서구') {
+          filtered = Array.from(allDongSet).filter(d => SEO_DONGS.has(d));
+        } else {
+          filtered = Array.from(allDongSet);
+        }
+        const available = new Set(filtered);
+        if (!next.dong || next.dong === '전체' || available.has(next.dong)) {
+          // 현재 선택된 dong을 유지
+        } else {
+          next.dong = '전체';
+        }
+      }
       try { localStorage.setItem('re_filters_v1', JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
-  }, []);
+  }, [properties]);
 
   const resetFilters = useCallback(() => {
     try { localStorage.removeItem('re_filters_v1'); } catch { /* ignore */ }
