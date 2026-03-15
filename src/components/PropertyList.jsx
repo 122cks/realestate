@@ -27,7 +27,7 @@ function sortProperties(list, sortKey) {
   });
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 100;
 
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────
 export default function PropertyList({
@@ -266,7 +266,13 @@ function PropertyRow({ prop, isSelected, isRouteSelected, routeIdx, routeMode, o
     ? 'border-l-4 border-l-purple-500 bg-purple-50'
     : isSelected
     ? 'border-l-4 border-l-blue-500 bg-blue-50'
-    : 'border-l-4 border-l-transparent hover:bg-slate-50';
+    : prop.isCompleted
+    ? 'border-l-4 border-l-slate-400 hover:bg-slate-50'
+    : prop.isVacant
+    ? 'border-l-4 border-l-green-500 hover:bg-slate-50'
+    : prop.type === '매매'
+    ? 'border-l-4 border-l-rose-500 hover:bg-slate-50'
+    : 'border-l-4 border-l-blue-400 hover:bg-slate-50';
 
   const typeStyle = TYPE_STYLE[prop.type] || TYPE_STYLE['임대'];
 

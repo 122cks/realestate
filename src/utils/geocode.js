@@ -120,16 +120,38 @@ export async function geocodeAddress(address) {
 
   // 주소 변형 후보 (한국 지번 보정)
   // 부평구 소속 동 목록 — 구 정보가 없으면 자동 보완
-  const BUPYEONG_DONGS = [
+  const BUPYEONG_DONGS_GEO = [
     '부평동', '삼산동', '갈산동', '산곡동', '청천동', '부개동',
     '일신동', '십정동', '작전동', '서운동', '효성동', '구산동',
   ];
+  const BUCHEON_DONGS_GEO = [
+    '상동', '중동', '원미동', '소사동', '약대동', '춘의동', '도당동',
+    '옥길동', '계수동', '항동', '여월동', '고강동', '오정동', '내동',
+    '삼정동', '작동', '범박동', '괴안동', '송내동', '심곡동', '역곡동',
+  ];
   const variants = [key];
+  // 인천 주소인데 구 정보가 없으면 구 자동 보완
   if (/^인천\s+[^\s]+\s+\d/.test(key) && !key.includes('구')) {
-    // 부평구 동이면 부평구로 지정
     const dongMatch = key.match(/^인천\s+([^\s]+동)/);
-    const gu = dongMatch && BUPYEONG_DONGS.includes(dongMatch[1]) ? '부평구' : '부평구';
-    variants.push(key.replace(/^인천\s+/, `인천 ${gu} `));
+    if (dongMatch) {
+      const dong = dongMatch[1];
+      const gu = BUPYEONG_DONGS_GEO.includes(dong) ? '부평구' : '부평구';
+      variants.push(key.replace(/^인천\s+/, `인천 ${gu} `));
+    }
+  }
+  // 부천시 주소 보완: "부천시 상동 ..." 형태로도 시도
+  if (/^부천시?\s+/.test(key)) {
+    const normalized = key.replace(/^부천시?\s+/, '');
+    variants.push(`경기도 부천시 ${normalized}`);
+    variants.push(`부천시 ${normalized}`);
+  }
+  // 부천 동이 인천 주소로 잘못 빌드된 경우 교정
+  if (/^인천\s+/.test(key)) {
+    const dongMatch = key.match(/^인천\s+([^\s]+동)\s+(.+)/);
+    if (dongMatch && BUCHEON_DONGS_GEO.includes(dongMatch[1])) {
+      variants.push(`경기도 부천시 ${dongMatch[1]} ${dongMatch[2]}`);
+      variants.push(`부천시 ${dongMatch[1]} ${dongMatch[2]}`);
+    }
   }
   // 건물명이 있을 경우 추가 변형
   const parenMatch = key.match(/^([^(]+)\s*\(([^)]+)\)/);

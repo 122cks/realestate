@@ -10,6 +10,7 @@ export default function MapView({
   properties = [],
   selectedId,
   onSelectProperty,
+  onBoundsChange,
   routeOrder,
   routeMode = false,
   routeSelection = [],
@@ -23,6 +24,7 @@ export default function MapView({
   useEffect(() => { propsRef.current = properties; }, [properties]);
 
   const [openPopupId, setOpenPopupId] = useState(null);
+  const [hoverPopupId, setHoverPopupId] = useState(null);
 
   const {
     map,
@@ -64,6 +66,15 @@ export default function MapView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [properties, boundsVersion]);
 
+  // 뷰포트 변경 시 부모에 ID 세트 전달
+  const onBoundsChangeRef = useRef(onBoundsChange);
+  useEffect(() => { onBoundsChangeRef.current = onBoundsChange; }, [onBoundsChange]);
+  useEffect(() => {
+    if (onBoundsChangeRef.current) {
+      onBoundsChangeRef.current(new Set(visibleProps.map(p => p.id)));
+    }
+  }, [visibleProps]);
+
   // 개별 마커 생성/제거 (클러스터링 없음 — 모든 매물 점으로 표시)
   useEffect(() => {
     if (!map) return;
@@ -100,11 +111,25 @@ export default function MapView({
       outer.addEventListener('click', (e) => {
         e.stopPropagation();
         if (routeMode && onToggleRoute) {
-          onToggleRoute(prop);
+          onToggleRoute(prop.id);
         } else {
           onSelectProperty(prop);
           setOpenPopupId(prev => prev === prop.id ? null : prop.id);
+          setHoverPopupId(null);
         }
+      });
+
+      // 호버 팝업 (데스크톱)
+      let hoverTimer;
+      outer.addEventListener('mouseenter', () => {
+        if (!routeMode) {
+          clearTimeout(hoverTimer);
+          hoverTimer = setTimeout(() => setHoverPopupId(prop.id), 200);
+        }
+      });
+      outer.addEventListener('mouseleave', () => {
+        clearTimeout(hoverTimer);
+        setHoverPopupId(prev => prev === prop.id ? null : prev);
       });
 
       const overlay = new window.kakao.maps.CustomOverlay({
@@ -160,19 +185,20 @@ export default function MapView({
     const popup     = popupOverlayRef.current;
     const container = popupContainerRef.current;
     if (!popup || !container) return;
-    if (!openPopupId) { popup.setMap(null); return; }
-    const prop = properties.find(p => p.id === openPopupId);
+    const activeId = openPopupId || hoverPopupId;
+    if (!activeId) { popup.setMap(null); return; }
+    const prop = properties.find(p => p.id === activeId);
     if (!prop || !Number.isFinite(prop.lat)) { popup.setMap(null); return; }
     container.innerHTML = buildPopupHTML(prop);
     container.querySelector('[data-action="close"]')?.addEventListener('click', e => {
-      e.stopPropagation(); setOpenPopupId(null);
+      e.stopPropagation(); setOpenPopupId(null); setHoverPopupId(null);
     });
     container.querySelector('[data-action="detail"]')?.addEventListener('click', e => {
-      e.stopPropagation(); onSelectProperty(prop); setOpenPopupId(null);
+      e.stopPropagation(); onSelectProperty(prop); setOpenPopupId(null); setHoverPopupId(null);
     });
     popup.setPosition(new window.kakao.maps.LatLng(prop.lat, prop.lng));
     popup.setMap(map);
-  }, [openPopupId, properties, onSelectProperty, map, popupContainerRef, popupOverlayRef]);
+  }, [openPopupId, hoverPopupId, properties, onSelectProperty, map, popupContainerRef, popupOverlayRef]);
 
   // 경로 폴리라인
   useEffect(() => {
@@ -297,7 +323,7 @@ function applyMarkerStyle(inner, prop, isSelected, isRouteSelected, routeMode, r
   else if (prop.type==='매매')  { bg='#f87171'; border='#dc2626'; shadow='rgba(239,68,68,0.40)'; }
   else                          { bg='#60a5fa'; border='#2563eb'; shadow='rgba(59,130,246,0.40)'; }
 
-  const size    = isSelected ? 20 : isRouteSelected ? 16 : isCompleted ? 9 : 13;
+  const size    = isSelected ? 14 : isRouteSelected ? 11 : isCompleted ? 6 : 9;
   const scale   = isSelected ? 1.2 : isRouteSelected ? 1.05 : 1;
   const opacity = prop.approxLocation && !isCompleted ? 0.55 : isCompleted ? 0.65 : 1;
 

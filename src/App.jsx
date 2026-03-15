@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import MapView from './components/MapView';
 import FilterBar from './components/FilterBar';
 import PropertyList from './components/PropertyList';
@@ -52,6 +52,58 @@ function App() {
   const [editingProperty, setEditingProperty] = useState(null);
   const [isStatsPanelOpen, setIsStatsPanelOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState('list'); // 'map' | 'list'
+  const [mapVisibleIds, setMapVisibleIds] = useState(null); // Set<id> | null
+
+  // 모바일 하단 시트 드래그
+  const SNAP_COLLAPSED = 60;
+  const sheetRef = useRef(null);
+  const dragStartRef = useRef(null);
+  const [sheetHeight, setSheetHeight] = useState('45vh');
+  const [isDragging, setIsDragging] = useState(false);
+
+  function snapToHeight(pxHeight) {
+    const winH = window.innerHeight;
+    const snaps = [SNAP_COLLAPSED, winH * 0.45, winH * 0.82];
+    const closest = snaps.reduce((prev, curr) => Math.abs(curr - pxHeight) < Math.abs(prev - pxHeight) ? curr : prev);
+    if (closest <= SNAP_COLLAPSED) return `${SNAP_COLLAPSED}px`;
+    if (closest <= winH * 0.55) return '45vh';
+    return '82vh';
+  }
+
+  const onSheetTouchStart = useCallback((e) => {
+    const rect = sheetRef.current?.getBoundingClientRect();
+    dragStartRef.current = { y: e.touches[0].clientY, height: rect ? rect.height : 300 };
+    setIsDragging(true);
+  }, []);
+
+  const onSheetTouchMove = useCallback((e) => {
+    if (!dragStartRef.current) return;
+    const dy = dragStartRef.current.y - e.touches[0].clientY;
+    const newH = Math.max(SNAP_COLLAPSED, Math.min(window.innerHeight * 0.82, dragStartRef.current.height + dy));
+    setSheetHeight(`${newH}px`);
+  }, []);
+
+  const onSheetTouchEnd = useCallback(() => {
+    if (!dragStartRef.current || !sheetRef.current) { setIsDragging(false); return; }
+    setSheetHeight(snapToHeight(sheetRef.current.getBoundingClientRect().height));
+    setIsDragging(false);
+    dragStartRef.current = null;
+  }, []);
+
+  // 모바일 탭 → 시트 높이 연동
+  useEffect(() => {
+    if (mobileTab === 'map') setSheetHeight(`${SNAP_COLLAPSED}px`);
+    else if (mobileTab === 'list') setSheetHeight('45vh');
+  }, [mobileTab]);
+
+  // 완료처리 후에도 드로어가 최신 상태를 보여주도록 properties 배열에서 re-derive
+  const currentSelectedProperty = selectedProperty
+    ? (properties.find(p => p.id === selectedProperty.id) || selectedProperty)
+    : null;
+  const handleBoundsChange = useCallback((ids) => setMapVisibleIds(ids), []);
+  const viewportProps = mapVisibleIds
+    ? filteredProperties.filter(p => mapVisibleIds.has(p.id))
+    : filteredProperties;
 
   // Esc 키로 drawer/modal 닫기
   useEffect(() => {
@@ -225,10 +277,10 @@ function App() {
       )}
 
       {/* 메인 콘텐츠 */}
-      <main className="flex flex-1 overflow-hidden flex-col md:flex-row pb-14 md:pb-0">
+      <main className="flex flex-1 overflow-hidden flex-col md:flex-row pb-0">
 
         {/* 좌측: 카카오맵 */}
-        <section className={`${mobileTab === 'map' ? 'flex' : 'hidden'} md:flex flex-col md:w-1/2 w-full md:h-full h-full flex-shrink-0 relative md:border-r border-slate-300`}>
+        <section className="flex md:flex flex-col md:w-3/5 w-full md:h-full h-full flex-shrink-0 relative md:border-r border-slate-300">
           {loading ? (
             <div className="flex-1 flex items-center justify-center bg-slate-100">
               <div className="text-center">
@@ -241,6 +293,7 @@ function App() {
               properties={properties}
               selectedId={selectedProperty?.id}
               onSelectProperty={handleSelectProperty}
+              onBoundsChange={handleBoundsChange}
               routeOrder={routeResult?.route}
               routeMode={routeMode}
               routeSelection={routeSelection}
@@ -277,8 +330,8 @@ function App() {
           )}
         </section>
 
-        {/* 우측: 필터 + 매물 리스트 */}
-        <section className={`${mobileTab === 'list' ? 'flex' : 'hidden'} md:flex flex-col md:w-1/2 w-full h-full overflow-hidden bg-white`} aria-label="매물 목록 영역">
+        {/* 우측: 필터 + 매물 리스트 (Desktop only) */}
+        <section className="hidden md:flex flex-col md:w-2/5 h-full overflow-hidden bg-white" aria-label="매물 목록 영역">
           <FilterBar
             filters={filters}
             onUpdate={updateFilter}
@@ -290,8 +343,14 @@ function App() {
             onExportCSV={handleExportCSV}
           />
           <div className="flex-1 overflow-hidden flex flex-col">
+            {mapVisibleIds && mapVisibleIds.size > 0 && (
+              <div className="px-3 py-1.5 bg-blue-50 border-b border-blue-200 flex items-center justify-between text-xs flex-shrink-0">
+                <span className="text-blue-700 font-semibold">🗺️ 지도 영역 내 <b>{viewportProps.length}</b>건 표시</span>
+                <button onClick={() => setMapVisibleIds(null)} className="text-blue-500 hover:text-blue-700 underline">전체 보기</button>
+              </div>
+            )}
             <PropertyList
-              properties={filteredProperties}
+              properties={viewportProps}
               selectedId={selectedProperty?.id}
               onSelectProperty={handleSelectProperty}
               routeMode={routeMode}
@@ -302,10 +361,62 @@ function App() {
         </section>
       </main>
 
+      {/* ─── 모바일 하단 시트 (md 미만에서만 표시) ─── */}
+      <div
+        ref={sheetRef}
+        className="md:hidden fixed left-0 right-0 z-30 bg-white rounded-t-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{
+          bottom: '56px', /* 하단 nav 높이만큼 */
+          height: sheetHeight,
+          transition: isDragging ? 'none' : 'height 0.3s ease-out',
+        }}
+      >
+        {/* 드래그 핸들 */}
+        <div
+          className="flex-shrink-0 pt-2 pb-1 flex flex-col items-center gap-1 cursor-grab active:cursor-grabbing touch-none select-none"
+          onTouchStart={onSheetTouchStart}
+          onTouchMove={onSheetTouchMove}
+          onTouchEnd={onSheetTouchEnd}
+        >
+          <div className="w-10 h-1.5 bg-slate-300 rounded-full" />
+          <span className="text-xs text-slate-500 font-medium">
+            {filteredProperties.length}건 | {viewportProps.length !== filteredProperties.length ? `지도 내 ${viewportProps.length}건` : '전체 목록'}
+          </span>
+        </div>
+
+        {/* 모바일 FilterBar + PropertyList */}
+        <FilterBar
+          filters={filters}
+          onUpdate={updateFilter}
+          onReset={resetFilters}
+          totalCount={properties.filter(p => !p.isCompleted).length}
+          filteredCount={filteredProperties.length}
+          zones={zones}
+          managers={managers}
+          onExportCSV={handleExportCSV}
+        />
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          {mapVisibleIds && mapVisibleIds.size > 0 && (
+            <div className="px-3 py-1.5 bg-blue-50 border-b border-blue-200 flex items-center justify-between text-xs flex-shrink-0">
+              <span className="text-blue-700 font-semibold">🗺️ 지도 영역 내 <b>{viewportProps.length}</b>건</span>
+              <button onClick={() => setMapVisibleIds(null)} className="text-blue-500 hover:text-blue-700 underline">전체 보기</button>
+            </div>
+          )}
+          <PropertyList
+            properties={viewportProps}
+            selectedId={selectedProperty?.id}
+            onSelectProperty={(prop) => { handleSelectProperty(prop); setSheetHeight('45vh'); }}
+            routeMode={routeMode}
+            routeSelection={routeSelection}
+            onToggleRoute={toggleRouteSelection}
+          />
+        </div>
+      </div>
+
       {/* 상세 정보 드로어 */}
-      {isDrawerOpen && selectedProperty && (
+      {isDrawerOpen && currentSelectedProperty && (
         <PropertyDrawer
-          property={selectedProperty}
+          property={currentSelectedProperty}
           onClose={handleCloseDrawer}
           onEdit={handleEditProperty}
           onComplete={completeProperty}

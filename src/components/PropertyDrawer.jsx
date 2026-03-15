@@ -63,10 +63,21 @@ export default function PropertyDrawer({ property, onClose, onEdit, onComplete, 
   const [nearbyError, setNearbyError] = useState(null);
   const [showNearby, setShowNearby] = useState(false);
 
-  // 매물 변경 시 상태 초기화
+  // 매물 변경 시 상태 초기화 + 캐시 로드
   useEffect(() => {
-    setAiResult(null); setAiError(null); setAiLoading(false);
+    setAiError(null); setAiLoading(false);
     setNearbyData(null); setNearbyError(null); setShowNearby(false);
+    // 캐시된 Gemini 결과 로드
+    try {
+      const cached = localStorage.getItem(`re_gemini_${property.id}`);
+      if (cached) {
+        setAiResult(cached);
+        setShowAi(true);
+      } else {
+        setAiResult(null);
+        setShowAi(false);
+      }
+    } catch { setAiResult(null); setShowAi(false); }
   }, [property.id]);
 
   useEffect(() => {
@@ -281,6 +292,8 @@ ${'</'}body>${'</'}html>`;
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!text) throw new Error('응답 텍스트를 파싱할 수 없습니다.');
       setAiResult(text);
+      // 결과 캐시 저장 (property.id 기반)
+      try { localStorage.setItem(`re_gemini_${property.id}`, text); } catch { /* ignore */ }
     } catch (e) {
       setAiError(`분석 실패: ${e.message}`);
     } finally {
@@ -529,6 +542,13 @@ ${'</'}body>${'</'}html>`;
                 <Sparkles size={15} />
                 {GEMINI_API_KEY ? 'Gemini로 이 매물 분석하기' : 'API 키 미설정'}
               </button>
+            )}
+            {/* 캐시된 결과 재분석 버튼 */}
+            {aiResult && !aiLoading && (
+              <button
+                onClick={() => { setAiResult(null); setShowAi(false); try { localStorage.removeItem(`re_gemini_${property.id}`); } catch {} }}
+                className="mt-2 text-xs text-slate-400 hover:text-violet-600 underline transition"
+              >🔄 재분석</button>
             )}
             {/* 로딩 */}
             {aiLoading && (

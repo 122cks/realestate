@@ -129,13 +129,14 @@ function mapRowToProperty(row, idx) {
     businessName.startsWith('공실') ||
     (r.isVacantRaw === 'Y' || r.isVacantRaw === '공실');
 
-  // ─ 주소 구성: 동 + 번지 (인천 부평 지역)
+  // ─ 주소 구성: 동 + 번지 (인천/부천 지역)
   const dong = (r.dong || '').trim();
   const bunji = (r.bunji || '').trim();
   const buildingName = (r.buildingName || '').trim();
-  // 기존 address 컬럼이 있으면 우선 사용, 없으면 인천 + 동 + 번지로 구성
+  // 기존 address 컬럼이 있으면 우선 사용, 없으면 시 + 동 + 번지로 구성
   const addressFromSheet = (r.address || '').trim();
-  const addressBuilt = dong && bunji ? `인천 ${dong} ${bunji}` : dong ? `인천 ${dong}` : '';
+  const cityPrefix = BUCHEON_DONGS.has(dong) ? '부천시' : '인천';
+  const addressBuilt = dong && bunji ? `${cityPrefix} ${dong} ${bunji}` : dong ? `${cityPrefix} ${dong}` : '';
   const address = addressFromSheet || addressBuilt;
 
   // 층 파싱
@@ -256,7 +257,40 @@ function computeApproxPositions(props) {
 }
 
 // ─────────────────────────────────────────────
-// 메인 훅
+// 지역 분류 — 동 → 시/구 매핑
+// ─────────────────────────────────────────────
+const BUCHEON_DONGS = new Set([
+  '상동', '중동', '원미동', '소사동', '약대동', '춘의동', '도당동',
+  '옥길동', '계수동', '항동', '여월동', '고강동', '오정동', '내동',
+  '삼정동', '작동', '범박동', '괴안동', '송내동', '심곡동', '역곡동',
+  '소사본동', '중1동', '중2동', '중3동', '중4동', '중5동',
+]);
+
+const BUPYEONG_DONGS = new Set([
+  '부평동', '삼산동', '갈산동', '산곡동', '청천동', '부개동',
+  '일신동', '십정동', '작전동', '서운동', '효성동', '구산동',
+]);
+
+const GYEYANG_DONGS = new Set([
+  '계산동', '임학동', '용종동', '박촌동', '동양동', '병방동', '귤현동',
+  '갈현동', '오류동', '이화동', '평동', '방축동', '장기동', '서운동',
+]);
+
+const SEO_DONGS = new Set([
+  '가좌동', '신현동', '검암동', '경서동', '청라동', '연희동',
+  '공촌동', '원당동', '당하동', '마전동', '금곡동', '대곡동',
+  '불로동', '시천동', '백석동', '오류동', '심곡동',
+]);
+
+export function getDongRegion(dong) {
+  if (!dong) return null;
+  if (BUCHEON_DONGS.has(dong)) return '부천시';
+  if (BUPYEONG_DONGS.has(dong)) return '부평구';
+  if (GYEYANG_DONGS.has(dong)) return '계양구';
+  if (SEO_DONGS.has(dong)) return '서구';
+  return '인천시';
+}
+
 // ─────────────────────────────────────────────
 export function useProperties() {
   const [properties, setProperties] = useState([]);
@@ -267,6 +301,7 @@ export function useProperties() {
   const DEFAULT_FILTERS = {
     searchTerm: '',
     zone: '전체',
+    region: '전체',
     categories: ['임대','매매','공실'],
     isVacantOnly: false,
     type: '전체',
@@ -631,6 +666,17 @@ export function useProperties() {
         (p.notes || '').toLowerCase().includes(term);
 
       const matchZone = filters.zone === '전체' || p.zone === filters.zone;
+      const matchRegion = (() => {
+        const r = filters.region || '전체';
+        if (r === '전체') return true;
+        const dong = p.dong || '';
+        if (r === '부천시') return BUCHEON_DONGS.has(dong);
+        if (r === '인천시') return !BUCHEON_DONGS.has(dong);
+        if (r === '부평구') return BUPYEONG_DONGS.has(dong);
+        if (r === '계양구') return GYEYANG_DONGS.has(dong);
+        if (r === '서구')   return SEO_DONGS.has(dong);
+        return true;
+      })();
       const matchDepositMin = !filters.depositMin || p.deposit >= Number(filters.depositMin);
       const matchDepositMax = !filters.depositMax || p.deposit <= Number(filters.depositMax);
       const matchRentMin = !filters.rentMin || p.rent >= Number(filters.rentMin);
@@ -641,7 +687,7 @@ export function useProperties() {
       const matchAreaMax = !filters.areaMax || p.areaExclusive <= Number(filters.areaMax);
 
       return (
-        matchSearch && matchZone &&
+        matchSearch && matchZone && matchRegion &&
         matchDepositMin && matchDepositMax && matchRentMin && matchRentMax && matchPremiumMax &&
         matchManager && matchAreaMin && matchAreaMax
       );
@@ -661,6 +707,7 @@ export function useProperties() {
     setFilters({
       searchTerm: '',
       zone: '전체',
+      region: '전체',
       categories: ['임대', '매매', '공실'],
       isVacantOnly: false,
       type: '전체',

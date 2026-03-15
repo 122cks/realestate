@@ -125,9 +125,9 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
         </div>
       </div>
 
-      {/* 빠른 필터 토글 행 */}
-      <div className="px-4 pb-2 flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-wrap">
+      {/* 빠른 필터 토글 행 — 카테고리 */}
+      <div className="px-4 pb-1 flex items-center justify-between">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* 카테고리 버튼 그룹 */}
           {['임대','매매','공실','완료'].map((cat) => {
             const active = derivedCategories.includes(cat);
@@ -154,6 +154,24 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
           총 <span className="font-bold text-blue-600">{filteredCount}</span>개
           {filteredCount !== totalCount && <span className="text-slate-400"> / {totalCount}개</span>}
         </span>
+      </div>
+
+      {/* 지역 필터 버튼 행 */}
+      <div className="px-3 pb-2 flex items-center gap-1.5 overflow-x-auto flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
+        <span className="text-xs text-slate-400 flex-shrink-0 mr-0.5">지역</span>
+        {['전체', '인천시', '부천시', '부평구', '계양구', '서구'].map((r) => {
+          const active = (filters.region || '전체') === r;
+          return (
+            <button
+              key={r}
+              onClick={() => onUpdate('region', r)}
+              className={`px-2.5 py-1 text-xs rounded-full border whitespace-nowrap transition flex-shrink-0 font-medium
+                ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+            >
+              {r}
+            </button>
+          );
+        })}
       </div>
 
       {/* 상세 필터 패널 (접기/펼치기) */}
