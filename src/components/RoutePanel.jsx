@@ -140,7 +140,7 @@ function RouteResult({ result }) {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color, bg }) {
+function StatCard({ icon: Icon, label, value, color, bg }) { // eslint-disable-line no-unused-vars
   return (
     <div className={`${bg} rounded-lg p-2 text-center`}>
       <Icon size={14} className={`${color} mx-auto mb-0.5`} />

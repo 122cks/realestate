@@ -8,6 +8,7 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
   const debounceRef = useRef(null);
 
   // 외부(예: 초기화) 에서 filters.searchTerm 변경 시 동기화
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setLocalSearch(filters.searchTerm || ''); }, [filters.searchTerm]);
 
   const handleSearchChange = useCallback((e) => {

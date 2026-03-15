@@ -90,8 +90,9 @@ export default function useKakaoMap(mapContainerRef, initialOptions = {}) {
       // ZoomControl 제거
       try { mapInstance.removeControl(zoomControl, window.kakao.maps.ControlPosition.RIGHT); } catch { /* noop */ }
       // DOM 비우기 — 지도 객체 및 캔버스 해제
-      if (mapContainerRef.current) {
-        mapContainerRef.current.innerHTML = '';
+      const container = mapContainerRef.current;
+      if (container) {
+        container.innerHTML = '';
       }
       mapRef.current = null;
     };

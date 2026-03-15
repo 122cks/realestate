@@ -76,7 +76,7 @@ export async function fetchUserInfo(accessToken) {
   try {
     const url = 'https://www.googleapis.com/oauth2/v3/userinfo';
     return await fetchJson(url, accessToken);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -141,7 +141,7 @@ export function revokeToken(token) {
     if (typeof window !== 'undefined' && window.google && window.google.accounts && window.google.accounts.oauth2) {
       window.google.accounts.oauth2.revoke(token, () => {});
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
 }

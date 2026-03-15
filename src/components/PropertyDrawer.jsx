@@ -20,7 +20,7 @@ const TYPE_STYLE = {
   매매: 'bg-rose-100 text-rose-800 border-rose-200',
 };
 
-function InfoRow({ icon: Icon, label, value, highlight, className = '' }) {
+function InfoRow({ icon: Icon, label, value, highlight, className = '' }) { // eslint-disable-line no-unused-vars
   if (!value && value !== 0) return null;
   return (
     <div className={`flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0 ${className}`}>
@@ -329,7 +329,7 @@ ${'</'}body>${'</'}html>`;
         }))
       );
       setNearbyData(results);
-    } catch (e) {
+    } catch {
       setNearbyError('주변 정보 조회 중 오류가 발생했습니다.');
     } finally {
       setNearbyLoading(false);
@@ -546,7 +546,7 @@ ${'</'}body>${'</'}html>`;
             {/* 캐시된 결과 재분석 버튼 */}
             {aiResult && !aiLoading && (
               <button
-                onClick={() => { setAiResult(null); setShowAi(false); try { localStorage.removeItem(`re_gemini_${property.id}`); } catch {} }}
+                onClick={() => { setAiResult(null); setShowAi(false); try { localStorage.removeItem(`re_gemini_${property.id}`); } catch { /* ignore */ } }}
                 className="mt-2 text-xs text-slate-400 hover:text-violet-600 underline transition"
               >🔄 재분석</button>
             )}
@@ -734,7 +734,7 @@ ${'</'}body>${'</'}html>`;
   );
 }
 
-function ContactCard({ icon: Icon, label, phone, name, iconColor, bgColor, emptyLabel }) {
+function ContactCard({ icon: Icon, label, phone, name, iconColor, bgColor, emptyLabel }) { // eslint-disable-line no-unused-vars
   const hasPhone = phone && phone.trim() !== '';
   return (
     <div className={`flex items-center gap-3 p-3 rounded-xl border border-slate-200 ${bgColor}`}>

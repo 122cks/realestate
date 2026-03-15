@@ -320,7 +320,7 @@ export function useProperties() {
     try {
       const saved = localStorage.getItem('re_filters_v1');
       if (saved) return { ...DEFAULT_FILTERS, ...JSON.parse(saved) };
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
     return DEFAULT_FILTERS;
   });
 
@@ -395,7 +395,7 @@ export function useProperties() {
               }
             }
           }
-        } catch (eStatic) {
+        } catch {
           console.info('[useProperties] 정적 CSV 없음 → 구글 시트 직접 조회');
         }
 
@@ -502,7 +502,7 @@ export function useProperties() {
   }, []);
 
   const disconnectGoogle = useCallback(() => {
-    try { if (googleToken) revokeToken(googleToken); } catch (e) { /* ignore */ }
+    try { if (googleToken) revokeToken(googleToken); } catch { /* ignore */ }
     setGoogleUser(null);
     setGoogleToken(null);
   }, [googleToken]);
@@ -697,13 +697,13 @@ export function useProperties() {
   const updateFilter = useCallback((key, value) => {
     setFilters((prev) => {
       const next = { ...prev, [key]: value };
-      try { localStorage.setItem('re_filters_v1', JSON.stringify(next)); } catch (e) { /* ignore */ }
+      try { localStorage.setItem('re_filters_v1', JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
   }, []);
 
   const resetFilters = useCallback(() => {
-    try { localStorage.removeItem('re_filters_v1'); } catch (e) { /* ignore */ }
+    try { localStorage.removeItem('re_filters_v1'); } catch { /* ignore */ }
     setFilters({
       searchTerm: '',
       zone: '전체',

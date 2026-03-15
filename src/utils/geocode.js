@@ -33,7 +33,7 @@ function openDB() {
       req.onsuccess  = () => { _db = req.result; resolve(_db); };
       req.onerror    = () => resolve(null);
       req.onblocked  = () => resolve(null);
-    } catch (e) { resolve(null); }
+    } catch { resolve(null); }
   });
 }
 
@@ -43,7 +43,7 @@ function idbPut(key, value) {
     try {
       const tx = db.transaction(STORE, 'readwrite');
       tx.objectStore(STORE).put(value, key);
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
   });
 }
 
@@ -65,7 +65,7 @@ export const cacheWarmPromise = openDB().then(db => {
         }
       };
       req.onerror = () => resolve();
-    } catch (e) { resolve(); }
+    } catch { resolve(); }
   });
 }).catch(() => {});
 
@@ -74,7 +74,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function withRetry(fn, attempts = 2, delay = 120) {
   for (let i = 0; i < attempts; i++) {
-    try { const r = await fn(); if (r) return r; } catch (e) { /* retry */ }
+    try { const r = await fn(); if (r) return r; } catch { /* retry */ }
     if (i < attempts - 1) await sleep(delay * (i + 1));
   }
   return null;
@@ -105,7 +105,7 @@ async function kakaoGeocode(address) {
           resolve(null);
         }
       });
-    } catch (e) { resolve(null); }
+    } catch { resolve(null); }
   });
 }
 
@@ -207,7 +207,7 @@ export async function geocodeAddress(address) {
         return out;
       }
     }
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
   return null;
 }
 
@@ -216,5 +216,5 @@ export function clearGeocodeCache() {
   _db = null;
   try {
     if (typeof window !== 'undefined') window.indexedDB?.deleteDatabase(DB_NAME);
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
 }

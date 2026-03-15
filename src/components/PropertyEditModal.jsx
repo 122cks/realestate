@@ -228,7 +228,7 @@ export default function PropertyEditModal({ property, onSave, onClose, sheetMeta
   );
 }
 
-function FieldInput({ fieldKey, label, type, placeholder, options, value, onChange }) {
+function FieldInput({ label, type, placeholder, options, value, onChange }) {
   const inputClass = 'w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white';
 
   return (

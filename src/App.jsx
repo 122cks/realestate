@@ -25,7 +25,7 @@ function App() {
     filteredProperties,
     properties,
     loading,
-    error,
+    error: _error,
     filters,
     zones,
     managers,
@@ -115,7 +115,7 @@ function App() {
         // fallback to package.json version (dev)
         try {
           import('../package.json').then(m => { if (mounted) setBuildInfo({ version: m.version }); }).catch(() => {});
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
       });
     return () => { mounted = false; };
   }, []);
@@ -265,7 +265,7 @@ function App() {
             </div>
           ) : (
             <button
-              onClick={async () => { try { await connectGoogle(); } catch (e) {} }}
+              onClick={async () => { try { await connectGoogle(); } catch { /* ignore */ } }}
               className="px-3 py-1.5 bg-white text-slate-900 hover:bg-slate-100 rounded-lg text-sm font-semibold transition"
             >
               구글 연동
