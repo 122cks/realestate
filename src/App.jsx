@@ -50,6 +50,7 @@ function App() {
 
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [routeMode, setRouteMode] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
   const [isStatsPanelOpen, setIsStatsPanelOpen] = useState(false);
@@ -193,12 +194,21 @@ function App() {
 
   const handleSelectProperty = useCallback((prop, opts) => {
     setSelectedProperty(prop);
-    if (opts && opts.modal) setIsDrawerOpen(true);
-    else setIsDrawerOpen(true); // 기존 드로어도 기본적으로 열림
+    if (opts && opts.modal) {
+      setIsModalOpen(true);
+      setIsDrawerOpen(false);
+    } else {
+      setIsDrawerOpen(true);
+      setIsModalOpen(false);
+    }
   }, []);
 
   const handleCloseDrawer = useCallback(() => {
     setIsDrawerOpen(false);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setIsModalOpen(false);
   }, []);
 
   const handleToggleRouteMode = useCallback(() => {
@@ -211,6 +221,7 @@ function App() {
   const handleEditProperty = useCallback((prop) => {
     setEditingProperty(prop);
     setIsDrawerOpen(false);
+    setIsModalOpen(false);
   }, []);
 
   const handleSaveEdit = useCallback(async (id, patch) => {
@@ -488,6 +499,17 @@ function App() {
           onEdit={handleEditProperty}
           onComplete={completeProperty}
           onUncomplete={uncompleteProperty}
+        />
+      )}
+
+      {isModalOpen && currentSelectedProperty && (
+        <PropertyDrawer
+          property={currentSelectedProperty}
+          onClose={handleCloseModal}
+          onEdit={handleEditProperty}
+          onComplete={completeProperty}
+          onUncomplete={uncompleteProperty}
+          variant="modal"
         />
       )}
 
