@@ -81,6 +81,18 @@ function App() {
     setIsDragging(true);
   }, []);
 
+  // 폴백: 외부(예: MapView의 CustomOverlay)에서 전역 이벤트로 모달 열기 요청 수신
+  useEffect(() => {
+    const handler = (e) => {
+      try {
+        const prop = e?.detail?.property;
+        if (prop) handleSelectProperty(prop, { modal: true });
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('openPropertyModal', handler);
+    return () => window.removeEventListener('openPropertyModal', handler);
+  }, [handleSelectProperty]);
+
   const onSheetTouchMove = useCallback((e) => {
     if (!dragStartRef.current) return;
     const dy = dragStartRef.current.y - e.touches[0].clientY;

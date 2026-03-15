@@ -203,7 +203,13 @@ export default function MapView({
     const detailBtn = container.querySelector('[data-action="detail"]');
     detailBtn?.addEventListener('click', e => {
       e.stopPropagation();
-      if (typeof onSelectProperty === 'function') onSelectProperty(prop, { modal: true });
+      try {
+        if (typeof onSelectProperty === 'function') onSelectProperty(prop, { modal: true });
+      } catch (err) { console.warn('[MapView] onSelectProperty threw', err); }
+      // 안전망: React 콜백이 동작하지 않는 환경 대비 전역 이벤트로도 모달 요청 발행
+      try {
+        window.dispatchEvent(new CustomEvent('openPropertyModal', { detail: { property: prop } }));
+      } catch { /* ignore */ }
       setOpenPopupId(null);
       setHoverPopupId(null);
     });
