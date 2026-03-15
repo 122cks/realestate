@@ -380,7 +380,7 @@ function App() {
       <main className="flex flex-1 overflow-hidden flex-col md:flex-row pb-0">
 
         {/* 좌측: 카카오맵 */}
-        <section className="flex md:flex flex-col md:w-3/5 w-full md:h-full h-full flex-shrink-0 relative md:border-r border-slate-300">
+        <section className="flex flex-col w-full md:flex-1 md:h-full h-full flex-shrink-0 relative md:border-r border-slate-300">
           {loading ? (
             <div className="flex-1 flex items-center justify-center bg-slate-100">
               <div className="text-center">
@@ -431,7 +431,7 @@ function App() {
         </section>
 
         {/* 우측: 필터 + 매물 리스트 (Desktop only) */}
-        <section className="hidden md:flex flex-col md:w-2/5 h-full overflow-hidden bg-white" aria-label="매물 목록 영역">
+        <section className="hidden md:flex flex-col w-full md:w-96 h-full overflow-hidden bg-white" aria-label="매물 목록 영역">
           <FilterBar
             filters={filters}
             onUpdate={updateFilter}
