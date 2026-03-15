@@ -25,6 +25,7 @@ export default function MapView({
 
   const [openPopupId, setOpenPopupId] = useState(null);
   const [hoverPopupId, setHoverPopupId] = useState(null);
+  const [openPopupIsDetail, setOpenPopupIsDetail] = useState(false);
 
   const {
     map,
@@ -40,7 +41,7 @@ export default function MapView({
   // 지도 클릭 → 팝업 닫기
   useEffect(() => {
     if (!map) return;
-    const handler = () => setOpenPopupId(null);
+    const handler = () => { setOpenPopupId(null); setOpenPopupIsDetail(false); };
     window.kakao.maps.event.addListener(map, 'click', handler);
     return () => { try { window.kakao.maps.event.removeListener(map, 'click', handler); } catch { /**/ } };
   }, [map]);
@@ -77,7 +78,7 @@ export default function MapView({
         const center = map ? map.getCenter() : null;
         const centerCoords = center ? { lat: center.getLat(), lng: center.getLng() } : null;
         onBoundsChangeRef.current({ ids, center: centerCoords });
-      } catch (e) {
+      } catch {
         onBoundsChangeRef.current(new Set(visibleProps.map(p => p.id)));
       }
     }
@@ -121,8 +122,9 @@ export default function MapView({
         if (routeMode && onToggleRoute) {
           onToggleRoute(prop.id);
         } else {
-          onSelectProperty(prop);
+          // 점 클릭 시에는 썸네일만 표시 (상세보기 버튼으로 전체 보기 전환)
           setOpenPopupId(prev => prev === prop.id ? null : prop.id);
+          setOpenPopupIsDetail(false);
           setHoverPopupId(null);
         }
       });
@@ -197,16 +199,28 @@ export default function MapView({
     if (!activeId) { popup.setMap(null); return; }
     const prop = properties.find(p => p.id === activeId);
     if (!prop || !Number.isFinite(prop.lat)) { popup.setMap(null); return; }
-    container.innerHTML = buildPopupHTML(prop);
+    const isDetail = openPopupIsDetail && activeId === openPopupId;
+    container.innerHTML = isDetail ? buildPopupHTML(prop) : buildThumbnailHTML(prop);
     container.querySelector('[data-action="close"]')?.addEventListener('click', e => {
-      e.stopPropagation(); setOpenPopupId(null); setHoverPopupId(null);
+      e.stopPropagation(); setOpenPopupId(null); setHoverPopupId(null); setOpenPopupIsDetail(false);
     });
-    container.querySelector('[data-action="detail"]')?.addEventListener('click', e => {
-      e.stopPropagation(); onSelectProperty(prop); setOpenPopupId(null); setHoverPopupId(null);
+    const detailBtn = container.querySelector('[data-action="detail"]');
+    detailBtn?.addEventListener('click', e => {
+      e.stopPropagation();
+      if (!isDetail) {
+        // 썸네일에서 상세 팝업으로 전환 (아직 전체 상세 뷰는 열지 않음)
+        setOpenPopupIsDetail(true);
+      } else {
+        // 상세 팝업에서 '상세 정보 보기' 클릭 → 전체 상세 열기
+        onSelectProperty(prop);
+        setOpenPopupId(null);
+        setHoverPopupId(null);
+        setOpenPopupIsDetail(false);
+      }
     });
     popup.setPosition(new window.kakao.maps.LatLng(prop.lat, prop.lng));
     popup.setMap(map);
-  }, [openPopupId, hoverPopupId, properties, onSelectProperty, map, popupContainerRef, popupOverlayRef]);
+  }, [openPopupId, hoverPopupId, openPopupIsDetail, properties, onSelectProperty, map, popupContainerRef, popupOverlayRef]);
 
   // 경로 폴리라인
   useEffect(() => {
@@ -295,6 +309,32 @@ export default function MapView({
       )}
     </div>
   );
+}
+
+function buildThumbnailHTML(prop) {
+  const fmtM = v => {
+    if (!v && v !== 0) return '-';
+    if (v >= 10000) return `${(v/10000).toFixed(1)}억`;
+    return `${v.toLocaleString()}만`;
+  };
+  const addr = prop.address || '주소 미확인';
+  return `
+    <div style="background:white;border-radius:12px;padding:10px;box-shadow:0 8px 20px rgba(0,0,0,0.12);width:220px;position:relative;font-family:system-ui,-apple-system,sans-serif;" onclick="event.stopPropagation()">
+      <button data-action="close" style="position:absolute;top:6px;right:6px;border:none;background:#f1f5f9;border-radius:50%;width:20px;height:20px;font-size:12px;color:#64748b;cursor:pointer">×</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="width:56px;height:44px;background:#f3f4f6;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">사진</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:2px;">${prop.statusOrName||'(업체 정보 없음)'}</div>
+          <div style="font-size:11px;color:#94a3b8;line-height:1.2;">${addr}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <div style="flex:1;background:#f8fafc;border-radius:8px;padding:6px;text-align:center"><div style="font-size:10px;color:#94a3b8">보증금</div><div style="font-weight:800">${fmtM(prop.deposit)}</div></div>
+        <div style="flex:1;background:#fff7f7;border-radius:8px;padding:6px;text-align:center"><div style="font-size:10px;color:#94a3b8">월세</div><div style="font-weight:800;color:#dc2626">${fmtM(prop.rent)}</div></div>
+      </div>
+      <button data-action="detail" style="width:100%;padding:8px;background:#2563eb;color:white;border:none;border-radius:8px;cursor:pointer;margin-top:8px;font-weight:700">상세 정보 보기 →</button>
+    </div>
+  `;
 }
 
 // ─── 마커 DOM ──────────────────────────────────────────────────────────

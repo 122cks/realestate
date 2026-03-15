@@ -186,6 +186,7 @@ export async function updateSheetRowValues(spreadsheetId, sheetTitle, rowNum, va
  * 헤더 이름 → 내부 프로퍼티 키 매핑 기반.
  */
 const PROP_TO_SHEET_HEADERS = {
+  rawState: ['상태'],
   receivedDate: ['접수일'],
   zone: ['구역'],
   statusOrName: ['상호명/상태', '상호명', '상호 / 상태', '상태'],

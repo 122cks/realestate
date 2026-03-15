@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Search, SlidersHorizontal, RotateCcw, ChevronDown, ChevronUp, Download } from 'lucide-react';
 
-export default function FilterBar({ filters, onUpdate, onReset, totalCount, filteredCount, zones, managers, dongs, onExportCSV }) {
+export default function FilterBar({ filters, onUpdate, onReset, totalCount, filteredCount, zones, managers, dongs, states, onExportCSV }) {
   const [isExpanded, setIsExpanded] = useState(false);
   // 검색어 디바운스: 로컨 타이핑 중 직접 상태 변경 없이 250ms 후 반영
   const [localSearch, setLocalSearch] = useState(filters.searchTerm || '');
@@ -160,19 +160,29 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
       {/* 지역 필터 버튼 행 */}
       <div className="px-3 pb-2 flex items-center gap-1.5 overflow-x-auto flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
         <span className="text-xs text-slate-400 flex-shrink-0 mr-0.5">시도</span>
-        {['전체', '인천시', '부천시', '부평구', '계양구', '서구'].map((r) => {
-          const active = (filters.region || '전체') === r;
-          return (
-            <button
-              key={r}
-              onClick={() => onUpdate('region', r)}
-              className={`px-2.5 py-1 text-xs rounded-full border whitespace-nowrap transition flex-shrink-0 font-medium
-                ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-            >
-              {r}
-            </button>
-          );
-        })}
+        {(() => {
+          const opts = ['전체', '인천시', '부천시', '부평구', '계양구', '서구'];
+          const selected = Array.isArray(filters.region) ? filters.region : [filters.region || '전체'];
+          return opts.map((r) => {
+            const active = selected.includes(r) || (r === '전체' && (selected.length === 0 || selected.includes('전체')));
+            const handleClick = () => {
+              if (r === '전체') { onUpdate('region', '전체'); return; }
+              let base = selected.filter(x => x !== '전체');
+              if (base.includes(r)) base = base.filter(x => x !== r); else base.push(r);
+              if (base.length === 0) onUpdate('region', '전체'); else onUpdate('region', base);
+            };
+            return (
+              <button
+                key={r}
+                onClick={handleClick}
+                className={`px-2.5 py-1 text-xs rounded-full border whitespace-nowrap transition flex-shrink-0 font-medium
+                  ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              >
+                {r}
+              </button>
+            );
+          });
+        })()}
       </div>
 
       {/* 동 필터 버튼 행 (선택된 지역에 동이 있는 경우만 표시) */}
@@ -180,15 +190,49 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
         <div className="px-3 pb-2 flex items-center gap-1.5 overflow-x-auto flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
           <span className="text-xs text-slate-400 flex-shrink-0 mr-0.5">동</span>
           {['전체', ...dongs].map((d) => {
-            const active = (filters.dong || '전체') === d;
+            const selectedD = Array.isArray(filters.dong) ? filters.dong : [filters.dong || '전체'];
+            const active = selectedD.includes(d) || (d === '전체' && (selectedD.length === 0 || selectedD.includes('전체')));
+            const handleClick = () => {
+              if (d === '전체') { onUpdate('dong', '전체'); return; }
+              let base = selectedD.filter(x => x !== '전체');
+              if (base.includes(d)) base = base.filter(x => x !== d); else base.push(d);
+              if (base.length === 0) onUpdate('dong', '전체'); else onUpdate('dong', base);
+            };
             return (
               <button
                 key={d}
-                onClick={() => onUpdate('dong', d)}
+                onClick={handleClick}
                 className={`px-2.5 py-1 text-xs rounded-full border whitespace-nowrap transition flex-shrink-0 font-medium
                   ${active ? 'bg-violet-600 text-white border-violet-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               >
                 {d}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 상태 필터 버튼 행 */}
+      {states && states.length > 0 && (
+        <div className="px-3 pb-2 flex items-center gap-1.5 overflow-x-auto flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
+          <span className="text-xs text-slate-400 flex-shrink-0 mr-0.5">상태</span>
+          {states.map((s) => {
+            const selectedS = Array.isArray(filters.state) ? filters.state : [filters.state || '전체'];
+            const active = selectedS.includes(s) || (s === '전체' && (selectedS.length === 0 || selectedS.includes('전체')));
+            const handleClick = () => {
+              if (s === '전체') { onUpdate('state', '전체'); return; }
+              let base = selectedS.filter(x => x !== '전체');
+              if (base.includes(s)) base = base.filter(x => x !== s); else base.push(s);
+              if (base.length === 0) onUpdate('state', '전체'); else onUpdate('state', base);
+            };
+            return (
+              <button
+                key={s}
+                onClick={handleClick}
+                className={`px-2.5 py-1 text-xs rounded-full border whitespace-nowrap transition flex-shrink-0 font-medium
+                  ${active ? 'bg-amber-600 text-white border-amber-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              >
+                {s}
               </button>
             );
           })}

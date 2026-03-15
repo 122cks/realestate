@@ -30,6 +30,7 @@ function App() {
     zones,
     dongs,
     managers,
+    states,
     updateFilter,
     resetFilters,
     connectGoogle,
@@ -402,6 +403,7 @@ function App() {
             zones={zones}
             dongs={dongs}
             managers={managers}
+            states={states}
             onExportCSV={handleExportCSV}
           />
           <div className="flex-1 overflow-hidden flex flex-col">
@@ -456,6 +458,7 @@ function App() {
           zones={zones}
           dongs={dongs}
           managers={managers}
+          states={states}
           onExportCSV={handleExportCSV}
         />
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">

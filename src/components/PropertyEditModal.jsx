@@ -55,12 +55,13 @@ export default function PropertyEditModal({ property, onSave, onClose, sheetMeta
       });
       patch.isVacant = isVacant;
 
-      // 완료 처리
+      // 완료 처리: 이름을 덮어쓰지 않고 상태(rawState)를 '완료'로 변경합니다.
       if (isCompleted) {
-        patch.statusOrName = '완료매물';
+        patch.rawState = '완료';
         patch.isCompleted = true;
       } else {
-        // 완료 취소 시 statusOrName을 form 값 사용
+        // 완료 취소 시 상태 필드를 비우고 isCompleted 플래그 해제
+        patch.rawState = '';
         patch.isCompleted = false;
       }
 

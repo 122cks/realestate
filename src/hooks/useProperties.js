@@ -73,6 +73,9 @@ const HEADER_CANONICAL = {
   '임대인\n연락처': 'contactOwner',
 };
 
+// 로딩 시 제외할 원시 상태값 목록 (module-level로 고정)
+const EXCLUDE_RAW_STATES = ['완', '완료', '청우', '취소'];
+
 function canonicalKey(orig) {
   if (!orig && orig !== 0) return orig;
   // \n, \r, 공백 제거 후 매핑
@@ -369,14 +372,13 @@ export function useProperties() {
   useEffect(() => { propertiesRef.current = properties; }, [properties]);
 
   // 로딩 시 구글시트에 특정 상태값(rawState)이 해당되는 행을 제외
-  const EXCLUDE_RAW_STATES = ['완', '완료', '청우', '취소'];
-  function filterExcludedItems(items) {
+  const filterExcludedItems = useCallback((items) => {
     if (!Array.isArray(items)) return items;
     return items.filter((p) => {
       const state = String(p.rawState || '').trim();
       return !EXCLUDE_RAW_STATES.includes(state);
     });
-  }
+  }, []);
 
   // ─── 데이터 로드 ───
   useEffect(() => {
@@ -449,7 +451,7 @@ export function useProperties() {
       }
     };
     loadData();
-  }, []);
+  }, [filterExcludedItems]);
 
   // ─── Google 연동 ───
   const connectGoogle = useCallback(async () => {
@@ -521,7 +523,7 @@ export function useProperties() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filterExcludedItems]);
 
   const disconnectGoogle = useCallback(() => {
     try { if (googleToken) revokeToken(googleToken); } catch { /* ignore */ }
@@ -553,11 +555,13 @@ export function useProperties() {
   }, [googleToken, sheetMeta]);
 
   const completeProperty = useCallback(async (id) => {
-    await updateProperty(id, { statusOrName: '완료매물', isCompleted: true });
+    // 상태 필드(rawState)를 '완료'로 변경하고 시트에 반영합니다.
+    await updateProperty(id, { rawState: '완료', isCompleted: true });
   }, [updateProperty]);
 
-  const uncompleteProperty = useCallback(async (id, originalStatus) => {
-    await updateProperty(id, { statusOrName: originalStatus || '매물', isCompleted: false });
+  const uncompleteProperty = useCallback(async (id, originalState) => {
+    // 완료 취소 시 상태 필드를 원래값으로 복원하거나 비웁니다.
+    await updateProperty(id, { rawState: originalState || '', isCompleted: false });
   }, [updateProperty]);
 
   // ─── 경로 선택 ───
