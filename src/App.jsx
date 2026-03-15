@@ -191,9 +191,10 @@ function App() {
     URL.revokeObjectURL(url);
   }, [filteredProperties]);
 
-  const handleSelectProperty = useCallback((prop) => {
+  const handleSelectProperty = useCallback((prop, opts) => {
     setSelectedProperty(prop);
-    setIsDrawerOpen(true);
+    if (opts && opts.modal) setIsDrawerOpen(true);
+    else setIsDrawerOpen(true); // 기존 드로어도 기본적으로 열림
   }, []);
 
   const handleCloseDrawer = useCallback(() => {

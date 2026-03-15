@@ -51,7 +51,7 @@ function fmtShare(n) {
   return `${n.toLocaleString()}만`;
 }
 
-export default function PropertyDrawer({ property, onClose, onEdit, onComplete, onUncomplete }) {
+export default function PropertyDrawer({ property, onClose, onEdit, onComplete, onUncomplete, variant = 'drawer' }) {
   const [showCalc, setShowCalc] = useState(false);
   const [memo, setMemo] = useState('');
   const [aiResult, setAiResult] = useState(null);   // null | string
@@ -337,400 +337,415 @@ ${'</'}body>${'</'}html>`;
     }
   }, [property.lat, property.lng]);
 
+  const isModal = variant === 'modal';
+
+  const body = (
+    <>
+      {/* 헤더 */}
+      <div className="flex items-start justify-between p-5 border-b border-slate-200 bg-gradient-to-r from-slate-800 to-slate-700 text-white">
+        <div className="flex-1 min-w-0 pr-4">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${TYPE_STYLE[property.type] || TYPE_STYLE['임대']}`}>
+              {property.type}
+            </span>
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{property.zone}</span>
+            {property.isVacant && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-400/20 text-green-300 border border-green-400/30 animate-pulse">
+                ● 공실
+              </span>
+            )}
+            {property.isCompleted && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-500/50 text-slate-200 border border-slate-400/30">
+                ✓ 완료
+              </span>
+            )}
+          </div>
+          <h2 className="text-xl font-bold leading-tight">{property.statusOrName}</h2>
+          <p className="text-sm text-white/70 mt-1 flex items-center gap-1">
+            <MapPin size={13} />
+            {property.address}
+            {property.buildingName && ` (${property.buildingName})`}
+          </p>
+          {property.receivedDate && (
+            <p className="text-xs text-white/50 mt-1 flex items-center gap-1">
+              <Calendar size={11} /> 접수: {property.receivedDate}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition flex-shrink-0"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      {/* 스크롤 영역 */}
+      <div className="flex-1 overflow-y-auto">
+        {/* 가격 카드 */}
+        <div className="p-4 border-b border-slate-100">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">💰 가격 정보</h3>
+          <div className="grid grid-cols-3 gap-2.5">
+            <PriceCard label="보증금" value={fmt(property.deposit)} highlight="text-slate-800" />
+            <PriceCard label="월세" value={fmt(property.rent)} highlight="text-rose-600" />
+            <PriceCard
+              label="권리금"
+              value={property.premium > 0 ? fmt(property.premium) : '없음'}
+              highlight={property.premium > 0 ? 'text-amber-600' : 'text-slate-400'}
+            />
+          </div>
+          {property.maintenanceFee > 0 && (
+            <div className="mt-2 flex items-center justify-end gap-1.5 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-1.5">
+              <Wrench size={12} />
+              관리비 월 <span className="font-semibold text-slate-700">{property.maintenanceFee.toLocaleString()}만 원</span>
+            </div>
+          )}
+        </div>
+
+        {/* 투자 계산기 */}
+        <div className="p-4 border-b border-slate-100">
+          <button
+            onClick={() => setShowCalc(v => !v)}
+            className="w-full flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition"
+          >
+            <span className="flex items-center gap-1.5"><Calculator size={13} /> 투자 계산기</span>
+            {showCalc ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          {showCalc && (
+            <div className="mt-3 space-y-2">
+              {roi !== null && (
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl border border-green-200">
+                  <div>
+                    <p className="text-xs text-green-600 font-semibold">수익률 (ROI)</p>
+                    <p className="text-xs text-green-400 mt-0.5">월세×12 ÷ (보증금+권리금)</p>
+                  </div>
+                  <span className="text-2xl font-extrabold text-green-600">{roi}%</span>
+                </div>
+              )}
+              {depositPerPyeong !== null && (
+                <div className="flex items-center justify-between p-3 bg-sky-50 rounded-xl border border-sky-200">
+                  <div>
+                    <p className="text-xs text-sky-600 font-semibold">보증금 평단가</p>
+                    <p className="text-xs text-sky-400 mt-0.5">전용 {pyeong}평 기준</p>
+                  </div>
+                  <span className="text-lg font-extrabold text-sky-700">{depositPerPyeong.toLocaleString()}만/평</span>
+                </div>
+              )}
+              {brokerFee > 0 && (
+                <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-200">
+                  <div>
+                    <p className="text-xs text-amber-600 font-semibold">예상 중개수수료</p>
+                    <p className="text-xs text-amber-400 mt-0.5">상업용 0.9% 기준</p>
+                  </div>
+                  <span className="text-lg font-extrabold text-amber-700">{brokerFee.toLocaleString()}만 원</span>
+                </div>
+              )}
+              {totalInvestment > 0 && (
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div>
+                    <p className="text-xs text-slate-500 font-semibold">총 투자 예상액</p>
+                    <p className="text-xs text-slate-400 mt-0.5">보증금 + 권리금</p>
+                  </div>
+                  <span className="text-lg font-extrabold text-slate-700">{fmt(totalInvestment)}</span>
+                </div>
+              )}
+              {!roi && !depositPerPyeong && !brokerFee && (
+                <p className="text-xs text-slate-400 text-center py-2">가격/면적 정보를 입력하면 자동으로 계산됩니다.</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 물건 기본 정보 */}
+        <div className="p-4 border-b border-slate-100">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">🏢 물건 정보</h3>
+          <InfoRow icon={MapPin} label="주소" value={property.address} />
+          {property.buildingName && <InfoRow icon={Building2} label="건물명" value={property.buildingName} />}
+          <InfoRow icon={Layers} label="층수" value={[
+            property.floor ? `${property.floor}층` : null,
+            property.unit ? `${property.unit}호` : null,
+            property.totalFloors ? `(총 ${property.totalFloors}층)` : null
+          ].filter(Boolean).join(' ')} />
+          {(property.areaExclusive > 0 || property.areaSupply > 0) && (
+            <InfoRow icon={SquareStack} label="면적" value={[
+              property.areaExclusive > 0 ? `전용 ${property.areaExclusive}㎡` : null,
+              property.areaSupply > 0 ? `공급 ${property.areaSupply}㎡` : null
+            ].filter(Boolean).join(' / ')} />
+          )}
+          <InfoRow icon={Tag} label="구역" value={property.zone} />
+          {/* 편의시설 태그 */}
+          {(property.hasRestaurant || property.parking || property.hasElevator || property.bathroomType) && (
+            <div className="flex flex-wrap gap-1.5 py-2 border-b border-slate-100">
+              {property.hasRestaurant && <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 font-medium">🍳 식당가능</span>}
+              {property.parking && <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-medium">🚗 주차가능</span>}
+              {property.hasElevator && <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium">🛗 엘리베이터</span>}
+              {property.bathroomType && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium">🚽 화장실: {property.bathroomType}</span>}
+            </div>
+          )}
+        </div>
+
+        {/* 연락처 */}
+        <div className="p-4 border-b border-slate-100">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">📞 연락처</h3>
+          <div className="space-y-2">
+            <ContactCard icon={User} label="임대인 / 소유자" phone={property.contactOwner} name={property.ownerName} iconColor="text-blue-600" bgColor="bg-blue-50" />
+            <ContactCard icon={User} label="임차인 (현재 영업자)" phone={property.contactTenant} iconColor="text-orange-500" bgColor="bg-orange-50" emptyLabel="공실 (임차인 없음)" />
+          </div>
+          {(property.manager || property.confirmedDate) && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-1.5">
+              <User size={12} />
+              {property.manager && <span>담당: <span className="font-semibold text-slate-700">{property.manager}</span></span>}
+              {property.confirmedDate && <span className="ml-2">확인: <span className="font-semibold text-slate-700">{property.confirmedDate}</span></span>}
+            </div>
+          )}
+          {property.directions && (
+            <div className="mt-2 flex items-start gap-2 text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
+              <Navigation size={12} className="mt-0.5 flex-shrink-0 text-slate-400" />
+              <span>{property.directions}</span>
+            </div>
+          )}
+        </div>
+
+        {/* 비고 */}
+        {property.notes && (
+          <div className="p-4 border-b border-slate-100">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">📋 비고 및 특이사항</h3>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900 leading-relaxed whitespace-pre-line">
+              {property.notes}
+            </div>
+          </div>
+        )}
+
+        {/* AI 분석 (Gemini) */}
+        <div className="p-4 border-b border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Sparkles size={12} className="text-violet-500" /> AI 매물 분석
+            </h3>
+            {(aiResult || aiError) && (
+              <button
+                onClick={() => setShowAi(v => !v)}
+                className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-0.5"
+              >
+                {showAi ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                {showAi ? '접기' : '보기'}
+              </button>
+            )}
+          </div>
+          {/* 분석 버튼 */}
+          {!aiResult && !aiLoading && !aiError && (
+            <button
+              onClick={handleGeminiAnalyze}
+              disabled={!GEMINI_API_KEY}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-xl transition shadow-sm"
+            >
+              <Sparkles size={15} />
+              {GEMINI_API_KEY ? 'Gemini로 이 매물 분석하기' : 'API 키 미설정'}
+            </button>
+          )}
+          {/* 캐시된 결과 재분석 버튼 */}
+          {aiResult && !aiLoading && (
+            <button
+              onClick={() => { setAiResult(null); setShowAi(false); try { localStorage.removeItem(`re_gemini_${property.id}`); } catch { /* ignore */ } }}
+              className="mt-2 text-xs text-slate-400 hover:text-violet-600 underline transition"
+            >🔄 재분석</button>
+          )}
+          {/* 로딩 */}
+          {aiLoading && (
+            <div className="flex flex-col items-center justify-center py-6 gap-2 text-violet-600">
+              <Loader2 size={24} className="animate-spin" />
+              <p className="text-xs font-semibold">Gemini가 분석 중입니다...</p>
+            </div>
+          )}
+          {/* 에러 */}
+          {aiError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
+              {aiError}
+              <button
+                onClick={handleGeminiAnalyze}
+                className="block mt-2 text-red-600 underline font-semibold"
+              >다시 시도</button>
+            </div>
+          )}
+          {/* 결과 */}
+          {aiResult && showAi && (
+            <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-xl p-4 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
+              {aiResult}
+            </div>
+          )}
+          {aiResult && showAi && (
+            <button
+              onClick={handleGeminiAnalyze}
+              className="mt-2 text-xs text-violet-500 hover:text-violet-700 underline"
+            >다시 분석</button>
+          )}
+        </div>
+
+        {/* 주변 상권 분석 500m */}
+        {Number.isFinite(property.lat) && (
+          <div className="p-4 border-b border-slate-100">
+            <button
+              onClick={() => nearbyData || nearbyLoading ? setShowNearby(v => !v) : handleNearbyAnalysis()}
+              className="w-full flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition"
+            >
+              <span className="flex items-center gap-1.5"><Store size={13} /> 주변 상권 분석 (반경 500m)</span>
+              {nearbyLoading ? <Loader2 size={13} className="animate-spin text-blue-400" /> : (nearbyData ? (showNearby ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null)}
+            </button>
+            {showNearby && nearbyLoading && (
+              <div className="flex items-center justify-center gap-2 py-4 text-blue-500 text-xs">
+                <Loader2 size={16} className="animate-spin" /> 주변 시설 조회 중...
+              </div>
+            )}
+            {showNearby && nearbyError && (
+              <p className="text-xs text-red-500 mt-2">{nearbyError}</p>
+            )}
+            {showNearby && nearbyData && (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {nearbyData.map(cat => (
+                  <div key={cat.code} className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                    <div className="text-lg mb-1">{cat.emoji}</div>
+                    <p className="text-xs text-slate-500 font-medium">{cat.label}</p>
+                    <p className={`text-xl font-extrabold mt-0.5 ${cat.count > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{cat.count}</p>
+                    {cat.top.length > 0 && (
+                      <div className="mt-1.5 text-left space-y-0.5">
+                        {cat.top.map((name, i) => (
+                          <p key={i} className="text-[10px] text-slate-400 truncate">{name}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {showNearby && nearbyData && (
+              <p className="text-[10px] text-slate-400 mt-2 text-center">카카오맵 기준 반경 500m 이내 시설 수 (최대 15개)</p>
+            )}
+          </div>
+        )}
+
+        {/* 현장 메모 */}
+        <div className="p-4">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+            <PenLine size={12} /> 현장 메모 (내 기기에만 저장)
+          </h3>
+          <textarea
+            value={memo}
+            onChange={handleMemoChange}
+            placeholder="현장 방문 메모, 협상 내용, 특이사항 등..."
+            rows={3}
+            className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 resize-none placeholder-slate-400 text-slate-700"
+          />
+          {memo && <p className="text-xs text-slate-400 mt-1 text-right">{memo.length}자 · 자동 저장됨</p>}
+        </div>
+      </div>
+
+      {/* 하단 액션 버튼 */}
+      <div className="p-4 border-t border-slate-200 bg-white flex-shrink-0">
+        {/* 1행: 카카오맵 + 공유 + 수정 */}
+        <div className="flex gap-2 mb-2">
+          <button
+            onClick={() => {
+              const query = encodeURIComponent(property.address);
+              window.open(`https://map.kakao.com/?q=${query}`, '_blank', 'noopener,noreferrer');
+            }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-semibold text-sm rounded-xl transition"
+          >
+            <ExternalLink size={14} /> 카카오맵
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold text-sm rounded-xl transition"
+            title="매물 정보 복사/공유"
+          >
+            <Copy size={14} /> 공유
+          </button>
+          {onEdit && (
+            <button
+              onClick={() => onEdit(property)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-semibold text-sm rounded-xl transition"
+            >
+              <Pencil size={14} /> 수정
+            </button>
+          )}
+        </div>
+        {/* 2행: AI 분석 버튼 */}
+        <div className="mb-2">
+          <button
+            onClick={() => {
+              if (aiResult) { setShowAi(v => !v); } else { handleGeminiAnalyze(); }
+            }}
+            disabled={aiLoading || !GEMINI_API_KEY}
+            className="w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-xs rounded-xl transition"
+          >
+            {aiLoading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+            {aiLoading ? 'Gemini 분석 중...' : aiResult ? (showAi ? 'AI 분석 결과 접기' : 'AI 분석 결과 보기') : 'Gemini로 이 매물 분석'}
+          </button>
+        </div>
+        {/* 3행: 블로그 복사 + 인스타 복사 + 인쇄 */}
+        <div className="flex gap-2 mb-2">
+          <button
+            onClick={handleCopyBlog}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold text-xs rounded-xl transition"
+          >
+            <BarChart3 size={13} /> 블로그 복사
+          </button>
+          <button
+            onClick={handleCopyInstagram}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 font-semibold text-xs rounded-xl transition"
+          >
+            <Share2 size={13} /> 인스타 복사
+          </button>
+          <button
+            onClick={handlePrint}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 font-semibold text-xs rounded-xl transition"
+            title="인쇄 / PDF 저장"
+          >
+            <Printer size={13} /> 인쇄
+          </button>
+        </div>
+        {/* 4행: 완료처리 + 닫기 */}
+        <div className="flex gap-2">
+          {!property.isCompleted && onComplete && (
+            <button
+              onClick={() => { onComplete(property.id); onClose(); }}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-500 hover:bg-slate-600 text-white font-semibold text-sm rounded-xl transition"
+            >
+              <CheckCircle2 size={15} /> 완료 처리
+            </button>
+          )}
+          {property.isCompleted && onUncomplete && (
+            <button
+              onClick={() => { onUncomplete(property.id, ''); onClose(); }}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition"
+            >
+              <RotateCcw size={15} /> 완료 취소
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm rounded-xl transition"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <>
       <div className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm" onClick={onClose} />
-
-      <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col overflow-hidden animate-slide-in">
-        {/* 헤더 */}
-        <div className="flex items-start justify-between p-5 border-b border-slate-200 bg-gradient-to-r from-slate-800 to-slate-700 text-white">
-          <div className="flex-1 min-w-0 pr-4">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${TYPE_STYLE[property.type] || TYPE_STYLE['임대']}`}>
-                {property.type}
-              </span>
-              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{property.zone}</span>
-              {property.isVacant && (
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-400/20 text-green-300 border border-green-400/30 animate-pulse">
-                  ● 공실
-                </span>
-              )}
-              {property.isCompleted && (
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-500/50 text-slate-200 border border-slate-400/30">
-                  ✓ 완료
-                </span>
-              )}
-            </div>
-            <h2 className="text-xl font-bold leading-tight">{property.statusOrName}</h2>
-            <p className="text-sm text-white/70 mt-1 flex items-center gap-1">
-              <MapPin size={13} />
-              {property.address}
-              {property.buildingName && ` (${property.buildingName})`}
-            </p>
-            {property.receivedDate && (
-              <p className="text-xs text-white/50 mt-1 flex items-center gap-1">
-                <Calendar size={11} /> 접수: {property.receivedDate}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition flex-shrink-0"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* 스크롤 영역 */}
-        <div className="flex-1 overflow-y-auto">
-          {/* 가격 카드 */}
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">💰 가격 정보</h3>
-            <div className="grid grid-cols-3 gap-2.5">
-              <PriceCard label="보증금" value={fmt(property.deposit)} highlight="text-slate-800" />
-              <PriceCard label="월세" value={fmt(property.rent)} highlight="text-rose-600" />
-              <PriceCard
-                label="권리금"
-                value={property.premium > 0 ? fmt(property.premium) : '없음'}
-                highlight={property.premium > 0 ? 'text-amber-600' : 'text-slate-400'}
-              />
-            </div>
-            {property.maintenanceFee > 0 && (
-              <div className="mt-2 flex items-center justify-end gap-1.5 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-1.5">
-                <Wrench size={12} />
-                관리비 월 <span className="font-semibold text-slate-700">{property.maintenanceFee.toLocaleString()}만 원</span>
-              </div>
-            )}
-          </div>
-
-          {/* 투자 계산기 */}
-          <div className="p-4 border-b border-slate-100">
-            <button
-              onClick={() => setShowCalc(v => !v)}
-              className="w-full flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition"
-            >
-              <span className="flex items-center gap-1.5"><Calculator size={13} /> 투자 계산기</span>
-              {showCalc ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-            {showCalc && (
-              <div className="mt-3 space-y-2">
-                {roi !== null && (
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl border border-green-200">
-                    <div>
-                      <p className="text-xs text-green-600 font-semibold">수익률 (ROI)</p>
-                      <p className="text-xs text-green-400 mt-0.5">월세×12 ÷ (보증금+권리금)</p>
-                    </div>
-                    <span className="text-2xl font-extrabold text-green-600">{roi}%</span>
-                  </div>
-                )}
-                {depositPerPyeong !== null && (
-                  <div className="flex items-center justify-between p-3 bg-sky-50 rounded-xl border border-sky-200">
-                    <div>
-                      <p className="text-xs text-sky-600 font-semibold">보증금 평단가</p>
-                      <p className="text-xs text-sky-400 mt-0.5">전용 {pyeong}평 기준</p>
-                    </div>
-                    <span className="text-lg font-extrabold text-sky-700">{depositPerPyeong.toLocaleString()}만/평</span>
-                  </div>
-                )}
-                {brokerFee > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-200">
-                    <div>
-                      <p className="text-xs text-amber-600 font-semibold">예상 중개수수료</p>
-                      <p className="text-xs text-amber-400 mt-0.5">상업용 0.9% 기준</p>
-                    </div>
-                    <span className="text-lg font-extrabold text-amber-700">{brokerFee.toLocaleString()}만 원</span>
-                  </div>
-                )}
-                {totalInvestment > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <div>
-                      <p className="text-xs text-slate-500 font-semibold">총 투자 예상액</p>
-                      <p className="text-xs text-slate-400 mt-0.5">보증금 + 권리금</p>
-                    </div>
-                    <span className="text-lg font-extrabold text-slate-700">{fmt(totalInvestment)}</span>
-                  </div>
-                )}
-                {!roi && !depositPerPyeong && !brokerFee && (
-                  <p className="text-xs text-slate-400 text-center py-2">가격/면적 정보를 입력하면 자동으로 계산됩니다.</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* 물건 기본 정보 */}
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">🏢 물건 정보</h3>
-            <InfoRow icon={MapPin} label="주소" value={property.address} />
-            {property.buildingName && <InfoRow icon={Building2} label="건물명" value={property.buildingName} />}
-            <InfoRow icon={Layers} label="층수" value={[
-              property.floor ? `${property.floor}층` : null,
-              property.unit ? `${property.unit}호` : null,
-              property.totalFloors ? `(총 ${property.totalFloors}층)` : null
-            ].filter(Boolean).join(' ')} />
-            {(property.areaExclusive > 0 || property.areaSupply > 0) && (
-              <InfoRow icon={SquareStack} label="면적" value={[
-                property.areaExclusive > 0 ? `전용 ${property.areaExclusive}㎡` : null,
-                property.areaSupply > 0 ? `공급 ${property.areaSupply}㎡` : null
-              ].filter(Boolean).join(' / ')} />
-            )}
-            <InfoRow icon={Tag} label="구역" value={property.zone} />
-            {/* 편의시설 태그 */}
-            {(property.hasRestaurant || property.parking || property.hasElevator || property.bathroomType) && (
-              <div className="flex flex-wrap gap-1.5 py-2 border-b border-slate-100">
-                {property.hasRestaurant && <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 font-medium">🍳 식당가능</span>}
-                {property.parking && <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-medium">🚗 주차가능</span>}
-                {property.hasElevator && <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium">🛗 엘리베이터</span>}
-                {property.bathroomType && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium">🚽 화장실: {property.bathroomType}</span>}
-              </div>
-            )}
-          </div>
-
-          {/* 연락처 */}
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">📞 연락처</h3>
-            <div className="space-y-2">
-              <ContactCard icon={User} label="임대인 / 소유자" phone={property.contactOwner} name={property.ownerName} iconColor="text-blue-600" bgColor="bg-blue-50" />
-              <ContactCard icon={User} label="임차인 (현재 영업자)" phone={property.contactTenant} iconColor="text-orange-500" bgColor="bg-orange-50" emptyLabel="공실 (임차인 없음)" />
-            </div>
-            {(property.manager || property.confirmedDate) && (
-              <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-1.5">
-                <User size={12} />
-                {property.manager && <span>담당: <span className="font-semibold text-slate-700">{property.manager}</span></span>}
-                {property.confirmedDate && <span className="ml-2">확인: <span className="font-semibold text-slate-700">{property.confirmedDate}</span></span>}
-              </div>
-            )}
-            {property.directions && (
-              <div className="mt-2 flex items-start gap-2 text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
-                <Navigation size={12} className="mt-0.5 flex-shrink-0 text-slate-400" />
-                <span>{property.directions}</span>
-              </div>
-            )}
-          </div>
-
-          {/* 비고 */}
-          {property.notes && (
-            <div className="p-4 border-b border-slate-100">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">📋 비고 및 특이사항</h3>
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900 leading-relaxed whitespace-pre-line">
-                {property.notes}
-              </div>
-            </div>
-          )}
-
-          {/* AI 분석 (Gemini) */}
-          <div className="p-4 border-b border-slate-100">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                <Sparkles size={12} className="text-violet-500" /> AI 매물 분석
-              </h3>
-              {(aiResult || aiError) && (
-                <button
-                  onClick={() => setShowAi(v => !v)}
-                  className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-0.5"
-                >
-                  {showAi ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                  {showAi ? '접기' : '보기'}
-                </button>
-              )}
-            </div>
-            {/* 분석 버튼 */}
-            {!aiResult && !aiLoading && !aiError && (
-              <button
-                onClick={handleGeminiAnalyze}
-                disabled={!GEMINI_API_KEY}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-xl transition shadow-sm"
-              >
-                <Sparkles size={15} />
-                {GEMINI_API_KEY ? 'Gemini로 이 매물 분석하기' : 'API 키 미설정'}
-              </button>
-            )}
-            {/* 캐시된 결과 재분석 버튼 */}
-            {aiResult && !aiLoading && (
-              <button
-                onClick={() => { setAiResult(null); setShowAi(false); try { localStorage.removeItem(`re_gemini_${property.id}`); } catch { /* ignore */ } }}
-                className="mt-2 text-xs text-slate-400 hover:text-violet-600 underline transition"
-              >🔄 재분석</button>
-            )}
-            {/* 로딩 */}
-            {aiLoading && (
-              <div className="flex flex-col items-center justify-center py-6 gap-2 text-violet-600">
-                <Loader2 size={24} className="animate-spin" />
-                <p className="text-xs font-semibold">Gemini가 분석 중입니다...</p>
-              </div>
-            )}
-            {/* 에러 */}
-            {aiError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
-                {aiError}
-                <button
-                  onClick={handleGeminiAnalyze}
-                  className="block mt-2 text-red-600 underline font-semibold"
-                >다시 시도</button>
-              </div>
-            )}
-            {/* 결과 */}
-            {aiResult && showAi && (
-              <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-xl p-4 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
-                {aiResult}
-              </div>
-            )}
-            {aiResult && showAi && (
-              <button
-                onClick={handleGeminiAnalyze}
-                className="mt-2 text-xs text-violet-500 hover:text-violet-700 underline"
-              >다시 분석</button>
-            )}
-          </div>
-
-          {/* 주변 상권 분석 500m */}
-          {Number.isFinite(property.lat) && (
-            <div className="p-4 border-b border-slate-100">
-              <button
-                onClick={() => nearbyData || nearbyLoading ? setShowNearby(v => !v) : handleNearbyAnalysis()}
-                className="w-full flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition"
-              >
-                <span className="flex items-center gap-1.5"><Store size={13} /> 주변 상권 분석 (반경 500m)</span>
-                {nearbyLoading ? <Loader2 size={13} className="animate-spin text-blue-400" /> : (nearbyData ? (showNearby ? <ChevronUp size={14} /> : <ChevronDown size={14} />) : null)}
-              </button>
-              {showNearby && nearbyLoading && (
-                <div className="flex items-center justify-center gap-2 py-4 text-blue-500 text-xs">
-                  <Loader2 size={16} className="animate-spin" /> 주변 시설 조회 중...
-                </div>
-              )}
-              {showNearby && nearbyError && (
-                <p className="text-xs text-red-500 mt-2">{nearbyError}</p>
-              )}
-              {showNearby && nearbyData && (
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {nearbyData.map(cat => (
-                    <div key={cat.code} className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                      <div className="text-lg mb-1">{cat.emoji}</div>
-                      <p className="text-xs text-slate-500 font-medium">{cat.label}</p>
-                      <p className={`text-xl font-extrabold mt-0.5 ${cat.count > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{cat.count}</p>
-                      {cat.top.length > 0 && (
-                        <div className="mt-1.5 text-left space-y-0.5">
-                          {cat.top.map((name, i) => (
-                            <p key={i} className="text-[10px] text-slate-400 truncate">{name}</p>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {showNearby && nearbyData && (
-                <p className="text-[10px] text-slate-400 mt-2 text-center">카카오맵 기준 반경 500m 이내 시설 수 (최대 15개)</p>
-              )}
-            </div>
-          )}
-
-          {/* 현장 메모 */}
-          <div className="p-4">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-              <PenLine size={12} /> 현장 메모 (내 기기에만 저장)
-            </h3>
-            <textarea
-              value={memo}
-              onChange={handleMemoChange}
-              placeholder="현장 방문 메모, 협상 내용, 특이사항 등..."
-              rows={3}
-              className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 resize-none placeholder-slate-400 text-slate-700"
-            />
-            {memo && <p className="text-xs text-slate-400 mt-1 text-right">{memo.length}자 · 자동 저장됨</p>}
+      {isModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-hidden bg-white rounded-xl shadow-2xl">
+            {body}
           </div>
         </div>
-
-        {/* 하단 액션 버튼 */}
-        <div className="p-4 border-t border-slate-200 bg-white flex-shrink-0">
-          {/* 1행: 카카오맵 + 공유 + 수정 */}
-          <div className="flex gap-2 mb-2">
-            <button
-              onClick={() => {
-                const query = encodeURIComponent(property.address);
-                window.open(`https://map.kakao.com/?q=${query}`, '_blank', 'noopener,noreferrer');
-              }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-semibold text-sm rounded-xl transition"
-            >
-              <ExternalLink size={14} /> 카카오맵
-            </button>
-            <button
-              onClick={handleShare}
-              className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold text-sm rounded-xl transition"
-              title="매물 정보 복사/공유"
-            >
-              <Copy size={14} /> 공유
-            </button>
-            {onEdit && (
-              <button
-                onClick={() => onEdit(property)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-semibold text-sm rounded-xl transition"
-              >
-                <Pencil size={14} /> 수정
-              </button>
-            )}
-          </div>
-          {/* 2행: AI 분석 버튼 */}
-          <div className="mb-2">
-            <button
-              onClick={() => {
-                if (aiResult) { setShowAi(v => !v); } else { handleGeminiAnalyze(); }
-              }}
-              disabled={aiLoading || !GEMINI_API_KEY}
-              className="w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-xs rounded-xl transition"
-            >
-              {aiLoading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-              {aiLoading ? 'Gemini 분석 중...' : aiResult ? (showAi ? 'AI 분석 결과 접기' : 'AI 분석 결과 보기') : 'Gemini로 이 매물 분석'}
-            </button>
-          </div>
-          {/* 3행: 블로그 복사 + 인스타 복사 + 인쇄 */}
-          <div className="flex gap-2 mb-2">
-            <button
-              onClick={handleCopyBlog}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold text-xs rounded-xl transition"
-            >
-              <BarChart3 size={13} /> 블로그 복사
-            </button>
-            <button
-              onClick={handleCopyInstagram}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 font-semibold text-xs rounded-xl transition"
-            >
-              <Share2 size={13} /> 인스타 복사
-            </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 font-semibold text-xs rounded-xl transition"
-              title="인쇄 / PDF 저장"
-            >
-              <Printer size={13} /> 인쇄
-            </button>
-          </div>
-          {/* 4행: 완료처리 + 닫기 */}
-          <div className="flex gap-2">
-            {!property.isCompleted && onComplete && (
-              <button
-                onClick={() => { onComplete(property.id); onClose(); }}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-500 hover:bg-slate-600 text-white font-semibold text-sm rounded-xl transition"
-              >
-                <CheckCircle2 size={15} /> 완료 처리
-              </button>
-            )}
-            {property.isCompleted && onUncomplete && (
-              <button
-                onClick={() => { onUncomplete(property.id, ''); onClose(); }}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition"
-              >
-                <RotateCcw size={15} /> 완료 취소
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm rounded-xl transition"
-            >
-              닫기
-            </button>
-          </div>
+      ) : (
+        <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col overflow-hidden animate-slide-in">
+          {body}
         </div>
-      </div>
+      )}
     </>
   );
 }

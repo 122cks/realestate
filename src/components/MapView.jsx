@@ -203,7 +203,7 @@ export default function MapView({
     const detailBtn = container.querySelector('[data-action="detail"]');
     detailBtn?.addEventListener('click', e => {
       e.stopPropagation();
-      onSelectProperty(prop);
+      if (typeof onSelectProperty === 'function') onSelectProperty(prop, { modal: true });
       setOpenPopupId(null);
       setHoverPopupId(null);
     });
