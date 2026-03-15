@@ -1,1 +1,0 @@
-var e=`0.2.2`;export{e as version};
