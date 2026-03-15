@@ -1,4 +1,4 @@
-import React, { useState, useMemo, memo } from 'react';
+import React, { useState, useMemo, memo, useCallback } from 'react';
 import { MapPin, Building2, ArrowUpDown, Route, Plus, LayoutList, Layers, Tag, ChevronRight } from 'lucide-react';
 
 const fmt = (n) => (!n && n !== 0 ? '-' : n >= 10000 ? `${(n / 10000).toFixed(1)}억` : `${n.toLocaleString()}만`);
@@ -152,8 +152,8 @@ function ListView({ sorted, showCount, setShowCount, selectedId, onSelectPropert
             isRouteSelected={routeIdx !== -1}
             routeIdx={routeIdx}
             routeMode={routeMode}
-            onClick={() => onSelectProperty(prop)}
-            onToggleRoute={() => onToggleRoute && onToggleRoute(prop.id)}
+            onSelectProperty={onSelectProperty}
+            onToggleRoute={onToggleRoute}
           />
         );
       })}
@@ -230,8 +230,8 @@ function GroupedView({ sorted, groupBy, selectedId, onSelectProperty, routeMode,
                   isRouteSelected={routeIdx !== -1}
                   routeIdx={routeIdx}
                   routeMode={routeMode}
-                  onClick={() => onSelectProperty(prop)}
-                  onToggleRoute={() => onToggleRoute && onToggleRoute(prop.id)}
+                  onSelectProperty={onSelectProperty}
+                  onToggleRoute={onToggleRoute}
                   inGroup
                 />
               );
@@ -244,8 +244,15 @@ function GroupedView({ sorted, groupBy, selectedId, onSelectProperty, routeMode,
 }
 
 // ─── 매물 행 (네이버 부동산 스타일 통합 카드) ─────────────────────────────
-const PropertyRow = memo(function PropertyRow({ prop, isSelected, isRouteSelected, routeIdx, routeMode, onClick, onToggleRoute, inGroup }) {
+const PropertyRow = memo(function PropertyRow({ prop, isSelected, isRouteSelected, routeIdx, routeMode, onSelectProperty, onToggleRoute, inGroup }) {
   const [showNote, setShowNote] = useState(false);
+
+  const handleClick = useCallback(() => onSelectProperty(prop), [onSelectProperty, prop]);
+  const handleToggle = useCallback((e) => {
+    e.stopPropagation();
+    onToggleRoute && onToggleRoute(prop.id);
+  }, [onToggleRoute, prop.id]);
+  const handleNoteToggle = useCallback((e) => { e.stopPropagation(); setShowNote(v => !v); }, []);
 
   const borderClass = isRouteSelected
     ? 'border-l-4 border-l-purple-500 bg-purple-50'
@@ -286,14 +293,14 @@ const PropertyRow = memo(function PropertyRow({ prop, isSelected, isRouteSelecte
 
   return (
     <div className={`border-b border-slate-100 transition-colors cursor-pointer ${borderClass} ${prop.isCompleted ? 'opacity-55' : ''}`}>
-      <div className={`px-4 py-3 ${inGroup ? 'pl-6' : ''}`} onClick={onClick}>
+      <div className={`px-4 py-3 ${inGroup ? 'pl-6' : ''}`} onClick={handleClick}>
 
         {/* 상단: 유형배지 + 구역 + 가격 */}
         <div className="flex items-center justify-between gap-2 mb-1.5">
           <div className="flex items-center gap-1.5 min-w-0">
             {routeMode && (
               <button
-                onClick={(e) => { e.stopPropagation(); onToggleRoute && onToggleRoute(); }}
+                onClick={handleToggle}
                 className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs font-bold transition
                   ${isRouteSelected ? 'bg-purple-600 border-purple-600 text-white' : 'border-slate-300 text-slate-400 hover:border-purple-400'}`}
               >
@@ -339,7 +346,7 @@ const PropertyRow = memo(function PropertyRow({ prop, isSelected, isRouteSelecte
             {prop.notes.length > 60 && (
               <button
                 className="text-xs text-slate-400 hover:text-slate-600 mt-0.5"
-                onClick={(e) => { e.stopPropagation(); setShowNote(v => !v); }}
+                onClick={handleNoteToggle}
               >
                 {showNote ? '접기 ↑' : '더 보기 ↓'}
               </button>

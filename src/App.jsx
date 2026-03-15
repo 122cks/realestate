@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import MapView from './components/MapView';
 import FilterBar from './components/FilterBar';
 import PropertyList from './components/PropertyList';
@@ -63,6 +63,8 @@ function App() {
   const SNAP_COLLAPSED = 60;
   const sheetRef = useRef(null);
   const dragStartRef = useRef(null);
+  // handleSelectProperty의 최신 참조를 보관 — TDZ 없이 이벤트 핸들러에서 안전하게 호출
+  const handleSelectPropertyRef = useRef(null);
   const [sheetHeight, setSheetHeight] = useState('45vh');
   const [isDragging, setIsDragging] = useState(false);
 
@@ -82,16 +84,17 @@ function App() {
   }, []);
 
   // 폴백: 외부(예: MapView의 CustomOverlay)에서 전역 이벤트로 모달 열기 요청 수신
+  // ref를 통해 TDZ(선언 전 참조) 오류 방지 — deps 배열 불필요
   useEffect(() => {
     const handler = (e) => {
       try {
         const prop = e?.detail?.property;
-        if (prop) handleSelectProperty(prop, { modal: true });
+        if (prop) handleSelectPropertyRef.current?.(prop, { modal: true });
       } catch { /* ignore */ }
     };
     window.addEventListener('openPropertyModal', handler);
     return () => window.removeEventListener('openPropertyModal', handler);
-  }, [handleSelectProperty]);
+  }, []);
 
   const onSheetTouchMove = useCallback((e) => {
     if (!dragStartRef.current) return;
@@ -127,53 +130,54 @@ function App() {
       setMapCenter(null);
     }
   }, []);
-  let viewportProps = mapVisibleIds
-    ? filteredProperties.filter(p => mapVisibleIds.has(p.id))
-    : filteredProperties.slice();
+  // viewportProps: 필터+뷰포트 교집합 → 중복제거 → 거리순 정렬 (useMemo로 매 렌더 재계산 방지)
+  const viewportProps = useMemo(() => {
+    let list = mapVisibleIds
+      ? filteredProperties.filter(p => mapVisibleIds.has(p.id))
+      : filteredProperties.slice();
 
-  // 중복 매물(id 동일) 제거: 첫 등장 항목만 유지
-  try {
+    // 중복 매물(id 동일) 제거: 첫 등장 항목만 유지
     const seen = new Set();
-    viewportProps = viewportProps.filter(p => {
+    list = list.filter(p => {
       const id = p?.id ?? null;
-      if (id === null) return true; // id 없는 항목은 남김
+      if (id === null) return true;
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
     });
-  } catch {
-    // 실패해도 앱 동작에는 영향 없도록 무시
-  }
 
-  // 우선순위 정렬: 정확 위치(approxLocation=false) 우선, 그 다음 지도 중심과의 거리 순
-  if (mapCenter) {
-    const toRad = (d) => (d * Math.PI) / 180;
-    const distanceKm = (a) => {
-      if (!Number.isFinite(a.lat) || !Number.isFinite(a.lng)) return Number.POSITIVE_INFINITY;
-      const R = 6371;
-      const dLat = toRad(a.lat - mapCenter.lat);
-      const dLng = toRad(a.lng - mapCenter.lng);
-      const lat1 = toRad(mapCenter.lat);
-      const lat2 = toRad(a.lat);
-      const sinDLat = Math.sin(dLat / 2);
-      const sinDLng = Math.sin(dLng / 2);
-      const aa = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
-      const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
-      return R * c;
-    };
-    viewportProps.sort((a, b) => {
-      const aPrec = a.approxLocation ? 1 : 0;
-      const bPrec = b.approxLocation ? 1 : 0;
-      if (aPrec !== bPrec) return aPrec - bPrec;
-      return distanceKm(a) - distanceKm(b);
-    });
-  } else {
-    viewportProps.sort((a, b) => (a.approxLocation ? 1 : 0) - (b.approxLocation ? 1 : 0));
-  }
+    // 우선순위 정렬: 정확 위치 우선, 그 다음 지도 중심과의 거리 순
+    if (mapCenter) {
+      const toRad = (d) => (d * Math.PI) / 180;
+      const distanceKm = (a) => {
+        if (!Number.isFinite(a.lat) || !Number.isFinite(a.lng)) return Number.POSITIVE_INFINITY;
+        const R = 6371;
+        const dLat = toRad(a.lat - mapCenter.lat);
+        const dLng = toRad(a.lng - mapCenter.lng);
+        const lat1 = toRad(mapCenter.lat);
+        const lat2 = toRad(a.lat);
+        const sinDLat = Math.sin(dLat / 2);
+        const sinDLng = Math.sin(dLng / 2);
+        const aa = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+        const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+        return R * c;
+      };
+      list.sort((a, b) => {
+        const aPrec = a.approxLocation ? 1 : 0;
+        const bPrec = b.approxLocation ? 1 : 0;
+        if (aPrec !== bPrec) return aPrec - bPrec;
+        return distanceKm(a) - distanceKm(b);
+      });
+    } else {
+      list.sort((a, b) => (a.approxLocation ? 1 : 0) - (b.approxLocation ? 1 : 0));
+    }
+    return list;
+  }, [filteredProperties, mapVisibleIds, mapCenter]);
 
   useEffect(() => {
     let mounted = true;
-    fetch('/build-info.json')
+    const infoUrl = `${import.meta.env.BASE_URL || '/'}build-info.json`.replace(/\/\//g, '/');
+    fetch(infoUrl)
       .then(r => { if (!r.ok) throw new Error('no build info'); return r.json(); })
       .then(data => { if (mounted) setBuildInfo(data); })
       .catch(() => {
@@ -228,6 +232,8 @@ function App() {
       setIsModalOpen(false);
     }
   }, []);
+  // ref 갱신 — useEffect 없이 매 렌더마다 동기화 (staleness 없음)
+  handleSelectPropertyRef.current = handleSelectProperty;
 
   const handleCloseDrawer = useCallback(() => {
     setIsDrawerOpen(false);

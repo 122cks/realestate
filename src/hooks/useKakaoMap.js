@@ -84,15 +84,15 @@ export default function useKakaoMap(mapContainerRef, initialOptions = {}) {
     setMap(mapInstance);
 
     // ── 클린업: 컴포넌트 언마운트 시 이벤트 해제 & DOM 정리 ──
+    const containerEl = mapContainerRef.current;
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       try { window.kakao.maps.event.removeListener(mapInstance, 'idle', onIdle); } catch { /* noop */ }
       // ZoomControl 제거
       try { mapInstance.removeControl(zoomControl, window.kakao.maps.ControlPosition.RIGHT); } catch { /* noop */ }
       // DOM 비우기 — 지도 객체 및 캔버스 해제
-      const container = mapContainerRef.current;
-      if (container) {
-        container.innerHTML = '';
+      if (containerEl) {
+        containerEl.innerHTML = '';
       }
       mapRef.current = null;
     };
