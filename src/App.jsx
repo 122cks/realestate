@@ -119,6 +119,20 @@ function App() {
     ? filteredProperties.filter(p => mapVisibleIds.has(p.id))
     : filteredProperties.slice();
 
+  // 중복 매물(id 동일) 제거: 첫 등장 항목만 유지
+  try {
+    const seen = new Set();
+    viewportProps = viewportProps.filter(p => {
+      const id = p?.id ?? null;
+      if (id === null) return true; // id 없는 항목은 남김
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  } catch {
+    // 실패해도 앱 동작에는 영향 없도록 무시
+  }
+
   // 우선순위 정렬: 정확 위치(approxLocation=false) 우선, 그 다음 지도 중심과의 거리 순
   if (mapCenter) {
     const toRad = (d) => (d * Math.PI) / 180;
