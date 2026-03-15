@@ -57,8 +57,9 @@ export default function MapView({
     if (!bounds) return valid;
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
-    const latPad = (ne.getLat() - sw.getLat()) * 0.15;
-    const lngPad = (ne.getLng() - sw.getLng()) * 0.15;
+    // 패딩을 줄여 뷰포트 기준을 더 엄격하게 함 (5% 패딩)
+    const latPad = (ne.getLat() - sw.getLat()) * 0.05;
+    const lngPad = (ne.getLng() - sw.getLng()) * 0.05;
     return valid.filter(p =>
       p.lat >= sw.getLat() - latPad && p.lat <= ne.getLat() + latPad &&
       p.lng >= sw.getLng() - lngPad && p.lng <= ne.getLng() + lngPad
@@ -71,9 +72,16 @@ export default function MapView({
   useEffect(() => { onBoundsChangeRef.current = onBoundsChange; }, [onBoundsChange]);
   useEffect(() => {
     if (onBoundsChangeRef.current) {
-      onBoundsChangeRef.current(new Set(visibleProps.map(p => p.id)));
+      try {
+        const ids = new Set(visibleProps.map(p => p.id));
+        const center = map ? map.getCenter() : null;
+        const centerCoords = center ? { lat: center.getLat(), lng: center.getLng() } : null;
+        onBoundsChangeRef.current({ ids, center: centerCoords });
+      } catch (e) {
+        onBoundsChangeRef.current(new Set(visibleProps.map(p => p.id)));
+      }
     }
-  }, [visibleProps]);
+  }, [visibleProps, map]);
 
   // 개별 마커 생성/제거 (클러스터링 없음 — 모든 매물 점으로 표시)
   useEffect(() => {

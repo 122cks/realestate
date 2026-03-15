@@ -211,6 +211,24 @@ function computeApproxPositions(props) {
     c.lng = c.lng / c.count;
   });
 
+  // zone(구역) 단위 중심도 계산해 둠 — dong 정보가 없을 때 대체로 사용
+  const centersByZone = {};
+  for (const p of out) {
+    if (Number.isFinite(p.lat) && Number.isFinite(p.lng) && p.zone) {
+      const k = String(p.zone).trim();
+      if (!k) continue;
+      if (!centersByZone[k]) centersByZone[k] = { lat: 0, lng: 0, count: 0 };
+      centersByZone[k].lat += p.lat;
+      centersByZone[k].lng += p.lng;
+      centersByZone[k].count += 1;
+    }
+  }
+  Object.keys(centersByZone).forEach(k => {
+    const c = centersByZone[k];
+    c.lat = c.lat / c.count;
+    c.lng = c.lng / c.count;
+  });
+
   // 전역 중심
   const known = out.filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
   let globalLat = 37.502;
@@ -221,7 +239,7 @@ function computeApproxPositions(props) {
   }
 
   // 간단한 의사난수 기반 지터 — 겹침을 줄이기 위함
-  const jitter = (i, scale = 0.00045) => {
+  const jitter = (i, scale = 0.00025) => {
     const seed = (i * 9301 + 49297) % 233280;
     const r = seed / 233280;
     const ang = r * Math.PI * 2;
@@ -247,6 +265,9 @@ function computeApproxPositions(props) {
     if (dongKey && centersByDong[dongKey]) {
       baseLat = centersByDong[dongKey].lat;
       baseLng = centersByDong[dongKey].lng;
+    } else if (p.zone && centersByZone && centersByZone[p.zone]) {
+      baseLat = centersByZone[p.zone].lat;
+      baseLng = centersByZone[p.zone].lng;
     }
     const [dx, dy] = jitter(i);
     p.lat = baseLat + dx;

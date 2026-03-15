@@ -54,6 +54,7 @@ function App() {
   const [isStatsPanelOpen, setIsStatsPanelOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState('list'); // 'map' | 'list'
   const [mapVisibleIds, setMapVisibleIds] = useState(null); // Set<id> | null
+  const [mapCenter, setMapCenter] = useState(null);
   const [buildInfo, setBuildInfo] = useState(null);
 
   // 모바일 하단 시트 드래그
@@ -102,10 +103,45 @@ function App() {
   const currentSelectedProperty = selectedProperty
     ? (properties.find(p => p.id === selectedProperty.id) || selectedProperty)
     : null;
-  const handleBoundsChange = useCallback((ids) => setMapVisibleIds(ids), []);
-  const viewportProps = mapVisibleIds
+  const handleBoundsChange = useCallback((payload) => {
+    if (!payload) { setMapVisibleIds(null); setMapCenter(null); return; }
+    if (payload.ids) {
+      setMapVisibleIds(payload.ids);
+      setMapCenter(payload.center || null);
+    } else {
+      setMapVisibleIds(payload);
+      setMapCenter(null);
+    }
+  }, []);
+  let viewportProps = mapVisibleIds
     ? filteredProperties.filter(p => mapVisibleIds.has(p.id))
-    : filteredProperties;
+    : filteredProperties.slice();
+
+  // 우선순위 정렬: 정확 위치(approxLocation=false) 우선, 그 다음 지도 중심과의 거리 순
+  if (mapCenter) {
+    const toRad = (d) => (d * Math.PI) / 180;
+    const distanceKm = (a) => {
+      if (!Number.isFinite(a.lat) || !Number.isFinite(a.lng)) return Number.POSITIVE_INFINITY;
+      const R = 6371;
+      const dLat = toRad(a.lat - mapCenter.lat);
+      const dLng = toRad(a.lng - mapCenter.lng);
+      const lat1 = toRad(mapCenter.lat);
+      const lat2 = toRad(a.lat);
+      const sinDLat = Math.sin(dLat / 2);
+      const sinDLng = Math.sin(dLng / 2);
+      const aa = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+      const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+      return R * c;
+    };
+    viewportProps.sort((a, b) => {
+      const aPrec = a.approxLocation ? 1 : 0;
+      const bPrec = b.approxLocation ? 1 : 0;
+      if (aPrec !== bPrec) return aPrec - bPrec;
+      return distanceKm(a) - distanceKm(b);
+    });
+  } else {
+    viewportProps.sort((a, b) => (a.approxLocation ? 1 : 0) - (b.approxLocation ? 1 : 0));
+  }
 
   useEffect(() => {
     let mounted = true;
