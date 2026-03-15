@@ -10,8 +10,8 @@
  * 재방문  : L2 전량 L1 로드 → API 호출 0건, 즉시 반환
  */
 
-// v3: DB 버전 업 — 주소_type 정확도 체크 추가로 인한 캐시 초기화
-const DB_NAME = 'geocode_db_v3';
+// v4: DB 버전 업 — 모든 variant를 시도한 뒤 정확 매칭 우선 반환으로 변경
+const DB_NAME = 'geocode_db_v4';
 const STORE   = 'coords';
 
 // ── L1: 인메모리 캐시 ──────────────────────────────────────────────────────
@@ -138,15 +138,29 @@ export async function geocodeAddress(address) {
   }
 
   // L3: Kakao SDK (in-browser, 한국 주소 최적)
+  // 모든 variant를 시도해 정확한 매칭(address_type=REGION_ADDR/ROAD_ADDR)을 우선 반환
+  // 정확한 결과가 없으면 근사 결과를 fallback으로 사용
   if (typeof window !== 'undefined' && window.kakao?.maps?.services) {
+    let bestApprox = null;
     for (const q of variants) {
       const r = await withRetry(() => kakaoGeocode(q), 2, 120);
       if (r) {
-        const out = { lat: r.lat, lng: r.lng, source: 'kakao', approxLocation: r.approxLocation || false };
-        memCache.set(key, out);
-        idbPut(key, out);
-        return out;
+        if (!r.approxLocation) {
+          // 정확한 지번/도로명 매칭 — 즉시 저장 후 반환
+          const out = { lat: r.lat, lng: r.lng, source: 'kakao', approxLocation: false };
+          memCache.set(key, out);
+          idbPut(key, out);
+          return out;
+        }
+        if (!bestApprox) bestApprox = r; // 첫 근사 결과를 보조 후보로 보관
       }
+    }
+    // 모든 variant에서 정확한 매칭 없음 → 근사 결과 반환
+    if (bestApprox) {
+      const out = { lat: bestApprox.lat, lng: bestApprox.lng, source: 'kakao', approxLocation: true };
+      memCache.set(key, out);
+      idbPut(key, out);
+      return out;
     }
     return null;
   }
