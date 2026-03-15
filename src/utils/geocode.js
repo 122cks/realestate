@@ -129,14 +129,26 @@ export async function geocodeAddress(address) {
     '옥길동', '계수동', '항동', '여월동', '고강동', '오정동', '내동',
     '삼정동', '작동', '범박동', '괴안동', '송내동', '심곡동', '역곡동',
   ];
+  const GYEYANG_DONGS_GEO = [
+    '계산동', '임학동', '용종동', '박촌동', '동양동', '병방동', '귤현동',
+    '갈현동', '오류동', '이화동', '평동', '방축동', '장기동', '서운동',
+  ];
+  const SEO_DONGS_GEO = [
+    '가좌동', '신현동', '검암동', '경서동', '청라동', '연희동',
+    '공촌동', '원당동', '당하동', '마전동', '금곡동', '대곡동',
+    '불로동', '시천동', '백석동', '오류동', '심곡동',
+  ];
   const variants = [key];
   // 인천 주소인데 구 정보가 없으면 구 자동 보완
   if (/^인천\s+[^\s]+\s+\d/.test(key) && !key.includes('구')) {
     const dongMatch = key.match(/^인천\s+([^\s]+동)/);
     if (dongMatch) {
       const dong = dongMatch[1];
-      const gu = BUPYEONG_DONGS_GEO.includes(dong) ? '부평구' : '부평구';
-      variants.push(key.replace(/^인천\s+/, `인천 ${gu} `));
+      let gu = null;
+      if (BUPYEONG_DONGS_GEO.includes(dong)) gu = '부평구';
+      else if (GYEYANG_DONGS_GEO.includes(dong)) gu = '계양구';
+      else if (SEO_DONGS_GEO.includes(dong)) gu = '서구';
+      if (gu) variants.push(key.replace(/^인천\s+/, `인천 ${gu} `));
     }
   }
   // 부천시 주소 보완: "부천시 상동 ..." 형태로도 시도

@@ -3,6 +3,7 @@ import { Search, SlidersHorizontal, RotateCcw, ChevronDown, ChevronUp, Download 
 
 export default function FilterBar({ filters, onUpdate, onReset, totalCount, filteredCount, zones, managers, dongs, states, onExportCSV }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [areaUnit, setAreaUnit] = useState('㎡'); // '㎡' | '평'
   // 검색어 디바운스: 로컨 타이핑 중 직접 상태 변경 없이 250ms 후 반영
   const [localSearch, setLocalSearch] = useState(filters.searchTerm || '');
   const debounceRef = useRef(null);
@@ -306,44 +307,81 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
               <p className="text-xs text-slate-400 mt-1">0 입력 시 권리금 없는 매물만</p>
             </div>
 
-            {/* 면적 범위 */}
+            {/* 면적 범위 — ㎡/평 단위 전환 */}
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-                전용면적 (㎡)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">전용면적</label>
+                <div className="flex rounded-md border border-slate-200 overflow-hidden text-xs font-semibold">
+                  {['㎡', '평'].map(u => (
+                    <button
+                      key={u}
+                      onClick={() => setAreaUnit(u)}
+                      className={`px-2 py-0.5 transition ${areaUnit === u ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                    >{u}</button>
+                  ))}
+                </div>
+              </div>
               <div className="flex items-center gap-1.5">
                 <input
                   type="number"
                   placeholder="최소"
                   className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                  value={filters.areaMin || ''}
-                  onChange={(e) => onUpdate('areaMin', e.target.value)}
+                  value={areaUnit === '평' && filters.areaMin ? (parseFloat(filters.areaMin) / 3.30579).toFixed(1) : (filters.areaMin || '')}
+                  onChange={(e) => {
+                    if (!e.target.value) { onUpdate('areaMin', null); return; }
+                    onUpdate('areaMin', areaUnit === '평' ? (parseFloat(e.target.value) * 3.30579).toFixed(2) : e.target.value);
+                  }}
                 />
                 <span className="text-slate-400 text-xs">∼</span>
                 <input
                   type="number"
                   placeholder="최대"
                   className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                  value={filters.areaMax || ''}
-                  onChange={(e) => onUpdate('areaMax', e.target.value)}
+                  value={areaUnit === '평' && filters.areaMax ? (parseFloat(filters.areaMax) / 3.30579).toFixed(1) : (filters.areaMax || '')}
+                  onChange={(e) => {
+                    if (!e.target.value) { onUpdate('areaMax', null); return; }
+                    onUpdate('areaMax', areaUnit === '평' ? (parseFloat(e.target.value) * 3.30579).toFixed(2) : e.target.value);
+                  }}
                 />
+                <span className="text-xs text-slate-400 w-6 flex-shrink-0">{areaUnit}</span>
               </div>
+              {(filters.areaMin || filters.areaMax) && (
+                <p className="text-xs text-slate-400 mt-1">
+                  {filters.areaMin ? `${parseFloat(filters.areaMin).toFixed(0)}㎡ (${(parseFloat(filters.areaMin)/3.30579).toFixed(1)}평)` : ''}
+                  {filters.areaMin && filters.areaMax ? ' ~ ' : ''}
+                  {filters.areaMax ? `${parseFloat(filters.areaMax).toFixed(0)}㎡ (${(parseFloat(filters.areaMax)/3.30579).toFixed(1)}평)` : ''}
+                </p>
+              )}
+            </div>
+
+            {/* 층수 범위 */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">층수</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  placeholder="최소층"
+                  className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  value={filters.floorMin || ''}
+                  min={-5}
+                  onChange={(e) => onUpdate('floorMin', e.target.value || null)}
+                />
+                <span className="text-slate-400 text-xs">∼</span>
+                <input
+                  type="number"
+                  placeholder="최대층"
+                  className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  value={filters.floorMax || ''}
+                  min={-5}
+                  onChange={(e) => onUpdate('floorMax', e.target.value || null)}
+                />
+                <span className="text-xs text-slate-400 w-4 flex-shrink-0">층</span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">예: 1층만 보려면 최소/최대 모두 1</p>
             </div>
           </div>
         </div>
       )}
     </div>
-  );
-}
-
-function ToggleSwitch({ checked, onChange, label, activeColor }) {
-  return (
-    <label className="flex items-center gap-1.5 cursor-pointer select-none group">
-      <div className="relative" onClick={() => onChange(!checked)}>
-        <div className={`w-9 h-5 rounded-full transition-colors duration-200 ${checked ? activeColor : 'bg-slate-300'}`} />
-        <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
-      </div>
-      <span className="text-sm text-slate-600 group-hover:text-slate-900 transition">{label}</span>
-    </label>
   );
 }

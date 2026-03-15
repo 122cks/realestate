@@ -25,7 +25,6 @@ export default function MapView({
 
   const [openPopupId, setOpenPopupId] = useState(null);
   const [hoverPopupId, setHoverPopupId] = useState(null);
-  const [openPopupIsDetail, setOpenPopupIsDetail] = useState(false);
 
   const {
     map,
@@ -41,7 +40,7 @@ export default function MapView({
   // 지도 클릭 → 팝업 닫기
   useEffect(() => {
     if (!map) return;
-    const handler = () => { setOpenPopupId(null); setOpenPopupIsDetail(false); };
+    const handler = () => { setOpenPopupId(null); };
     window.kakao.maps.event.addListener(map, 'click', handler);
     return () => { try { window.kakao.maps.event.removeListener(map, 'click', handler); } catch { /**/ } };
   }, [map]);
@@ -122,9 +121,7 @@ export default function MapView({
         if (routeMode && onToggleRoute) {
           onToggleRoute(prop.id);
         } else {
-          // 점 클릭 시에는 썸네일만 표시 (상세보기 버튼으로 전체 보기 전환)
           setOpenPopupId(prev => prev === prop.id ? null : prop.id);
-          setOpenPopupIsDetail(false);
           setHoverPopupId(null);
         }
       });
@@ -190,7 +187,7 @@ export default function MapView({
     }
   }, [selectedId, properties, map]);
 
-  // 팝업 오버레이
+  // 팝업 오버레이 — 마커 클릭 → 썸네일 → 상세정보보기 클릭 → 바로 드로어 열기
   useEffect(() => {
     const popup     = popupOverlayRef.current;
     const container = popupContainerRef.current;
@@ -199,28 +196,20 @@ export default function MapView({
     if (!activeId) { popup.setMap(null); return; }
     const prop = properties.find(p => p.id === activeId);
     if (!prop || !Number.isFinite(prop.lat)) { popup.setMap(null); return; }
-    const isDetail = openPopupIsDetail && activeId === openPopupId;
-    container.innerHTML = isDetail ? buildPopupHTML(prop) : buildThumbnailHTML(prop);
+    container.innerHTML = buildThumbnailHTML(prop);
     container.querySelector('[data-action="close"]')?.addEventListener('click', e => {
-      e.stopPropagation(); setOpenPopupId(null); setHoverPopupId(null); setOpenPopupIsDetail(false);
+      e.stopPropagation(); setOpenPopupId(null); setHoverPopupId(null);
     });
     const detailBtn = container.querySelector('[data-action="detail"]');
     detailBtn?.addEventListener('click', e => {
       e.stopPropagation();
-      if (!isDetail) {
-        // 썸네일에서 상세 팝업으로 전환 (아직 전체 상세 뷰는 열지 않음)
-        setOpenPopupIsDetail(true);
-      } else {
-        // 상세 팝업에서 '상세 정보 보기' 클릭 → 전체 상세 열기
-        onSelectProperty(prop);
-        setOpenPopupId(null);
-        setHoverPopupId(null);
-        setOpenPopupIsDetail(false);
-      }
+      onSelectProperty(prop);
+      setOpenPopupId(null);
+      setHoverPopupId(null);
     });
     popup.setPosition(new window.kakao.maps.LatLng(prop.lat, prop.lng));
     popup.setMap(map);
-  }, [openPopupId, hoverPopupId, openPopupIsDetail, properties, onSelectProperty, map, popupContainerRef, popupOverlayRef]);
+  }, [openPopupId, hoverPopupId, properties, onSelectProperty, map, popupContainerRef, popupOverlayRef]);
 
   // 경로 폴리라인
   useEffect(() => {
@@ -317,22 +306,52 @@ function buildThumbnailHTML(prop) {
     if (v >= 10000) return `${(v/10000).toFixed(1)}억`;
     return `${v.toLocaleString()}만`;
   };
-  const addr = prop.address || '주소 미확인';
+  const toPyeong = m2 => m2 > 0 ? `${(m2 / 3.30579).toFixed(1)}평` : null;
+
+  const typeLabel = prop.isCompleted ? '완료' : prop.isVacant ? '공실' : (prop.type || '임대');
+  const headerBg = prop.isCompleted ? '#94a3b8'
+    : prop.isVacant ? '#16a34a'
+    : prop.type === '매매' ? '#dc2626'
+    : '#2563eb';
+
+  const priceStr = prop.isCompleted ? '완료'
+    : prop.type === '매매'
+    ? `매매 ${fmtM(prop.deposit)}`
+    : `${fmtM(prop.deposit)} / ${fmtM(prop.rent)}만`;
+
+  const py = toPyeong(prop.areaExclusive);
+  const areaStr = prop.areaExclusive > 0 ? `${prop.areaExclusive}㎡${py ? ` (${py})` : ''}` : '';
+  const floorStr = prop.floor ? `${prop.floor}층${prop.totalFloors ? '/' + prop.totalFloors + '층' : ''}` : '';
+  const infoStr = [areaStr, floorStr].filter(Boolean).join(' · ');
+
+  const tagItems = [
+    prop.parking && '주차',
+    prop.hasElevator && '엘베',
+    prop.hasRestaurant && '식당가능',
+    prop.approxLocation && '📍대략위치',
+  ].filter(Boolean);
+  const tags = tagItems.map(t => `<span style="font-size:10px;padding:1px 6px;border-radius:20px;background:#f1f5f9;color:#475569;">${t}</span>`).join('');
+
   return `
-    <div style="background:white;border-radius:12px;padding:10px;box-shadow:0 8px 20px rgba(0,0,0,0.12);width:220px;position:relative;font-family:system-ui,-apple-system,sans-serif;" onclick="event.stopPropagation()">
-      <button data-action="close" style="position:absolute;top:6px;right:6px;border:none;background:#f1f5f9;border-radius:50%;width:20px;height:20px;font-size:12px;color:#64748b;cursor:pointer">×</button>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div style="width:56px;height:44px;background:#f3f4f6;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">사진</div>
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:2px;">${prop.statusOrName||'(업체 정보 없음)'}</div>
-          <div style="font-size:11px;color:#94a3b8;line-height:1.2;">${addr}</div>
+    <div style="background:white;border-radius:14px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,0.16);width:252px;position:relative;font-family:system-ui,-apple-system,sans-serif;" onclick="event.stopPropagation()">
+      <div style="background:${headerBg};padding:10px 14px;padding-right:32px;">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;">
+          <span style="font-size:10px;font-weight:700;background:rgba(255,255,255,0.25);color:white;padding:1px 7px;border-radius:20px;">${typeLabel}</span>
+          ${prop.zone ? `<span style="font-size:10px;color:rgba(255,255,255,0.8);">${prop.zone}</span>` : ''}
         </div>
+        <div style="color:white;font-size:17px;font-weight:800;line-height:1.2;">${priceStr}</div>
       </div>
-      <div style="display:flex;gap:6px;margin-top:8px">
-        <div style="flex:1;background:#f8fafc;border-radius:8px;padding:6px;text-align:center"><div style="font-size:10px;color:#94a3b8">보증금</div><div style="font-weight:800">${fmtM(prop.deposit)}</div></div>
-        <div style="flex:1;background:#fff7f7;border-radius:8px;padding:6px;text-align:center"><div style="font-size:10px;color:#94a3b8">월세</div><div style="font-weight:800;color:#dc2626">${fmtM(prop.rent)}</div></div>
+      <button data-action="close" style="position:absolute;top:8px;right:10px;background:rgba(255,255,255,0.22);border:none;border-radius:50%;width:22px;height:22px;font-size:15px;color:white;cursor:pointer;line-height:1;">×</button>
+      <div style="padding:10px 14px 0;">
+        <p style="font-weight:700;font-size:13px;color:#0f172a;margin:0 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${prop.statusOrName || '(업체 정보 없음)'}</p>
+        ${infoStr ? `<p style="font-size:11px;color:#64748b;margin:0 0 2px;">${infoStr}</p>` : ''}
+        ${prop.address ? `<p style="font-size:10px;color:#94a3b8;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📍 ${prop.address}</p>` : ''}
+        ${tags ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;">${tags}</div>` : ''}
+        ${prop.notes ? `<p style="font-size:10px;color:#78350f;background:#fffbeb;padding:4px 7px;border-radius:5px;margin:6px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${prop.notes.substring(0, 60)}${prop.notes.length > 60 ? '…' : ''}</p>` : ''}
+        ${prop.maintenanceFee > 0 ? `<p style="font-size:10px;color:#6b7280;margin:4px 0 0;">관리비 ${fmtM(prop.maintenanceFee)}/월</p>` : ''}
+        ${prop.confirmedDate ? `<p style="font-size:10px;color:#9ca3af;margin:3px 0 0;">확인매물 ${prop.confirmedDate}${prop.manager ? ' · ' + prop.manager : ''}</p>` : ''}
       </div>
-      <button data-action="detail" style="width:100%;padding:8px;background:#2563eb;color:white;border:none;border-radius:8px;cursor:pointer;margin-top:8px;font-weight:700">상세 정보 보기 →</button>
+      <button data-action="detail" style="display:block;width:100%;padding:11px;background:#2563eb;color:white;border:none;cursor:pointer;font-size:13px;font-weight:700;margin-top:10px;letter-spacing:0.01em;font-family:system-ui,-apple-system,sans-serif;">상세 정보 보기 →</button>
     </div>
   `;
 }
@@ -395,57 +414,4 @@ function applyMarkerStyle(inner, prop, isSelected, isRouteSelected, routeMode, r
     position:relative;
   `;
   inner.innerHTML = innerDot;
-}
-
-// ─── 팝업 HTML ─────────────────────────────────────────────────────────
-function buildPopupHTML(prop) {
-  const bgType    = prop.type==='매매' ? '#fef2f2' : '#eff6ff';
-  const colorType = prop.type==='매매' ? '#dc2626' : '#2563eb';
-  const fmtM = v => {
-    if (!v && v!==0) return '-';
-    if (v>=10000) return `${(v/10000).toFixed(1)}억`;
-    return `${v.toLocaleString()}만`;
-  };
-  const tags = [
-    prop.isVacant      && '<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:20px;background:#dcfce7;color:#16a34a;">공실</span>',
-    prop.hasRestaurant && '<span style="font-size:10px;padding:1px 5px;border-radius:20px;background:#fef3c7;color:#d97706;">식당가능</span>',
-    prop.parking       && '<span style="font-size:10px;padding:1px 5px;border-radius:20px;background:#e0f2fe;color:#0369a1;">주차</span>',
-    prop.hasElevator   && '<span style="font-size:10px;padding:1px 5px;border-radius:20px;background:#f3e8ff;color:#7c3aed;">엘베</span>',
-    prop.bathroomType  && `<span style="font-size:10px;padding:1px 5px;border-radius:20px;background:#f1f5f9;color:#475569;">화장실:${prop.bathroomType}</span>`,
-  ].filter(Boolean).join('');
-  const contactBlock = (prop.contactOwner||prop.contactTenant) ? `
-    <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:11px;">
-      ${prop.contactOwner  ? `<div>🏠 <b>임대인</b> <a href="tel:${prop.contactOwner.replace(/[^0-9]/g,'')}" style="color:#2563eb;text-decoration:none;">${prop.contactOwner}</a></div>` : ''}
-      ${prop.contactTenant ? `<div style="margin-top:2px;">👤 <b>임차인</b> <a href="tel:${prop.contactTenant.replace(/[^0-9]/g,'')}" style="color:#ea580c;text-decoration:none;">${prop.contactTenant}</a></div>` : ''}
-    </div>` : '';
-  const notesBlock = prop.notes ? `
-    <div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 8px;font-size:10px;color:#78350f;line-height:1.4;max-height:60px;overflow-y:auto;">${prop.notes.substring(0,200)}${prop.notes.length>200?'…':''}</div>` : '';
-  const floorStr = prop.floor ? `${prop.floor}층${prop.totalFloors?' / 총 '+prop.totalFloors+'층':''}` : '-';
-  const areaStr  = prop.areaExclusive > 0 ? `${prop.areaExclusive}㎡` : '-';
-  const mgr = prop.manager ? `<div style="margin-top:4px;font-size:10px;color:#6b7280;">담당: ${prop.manager}${prop.confirmedDate?' · '+prop.confirmedDate:''}</div>` : '';
-  return `
-    <div style="background:white;border-radius:14px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.18);border:1px solid #e2e8f0;width:280px;position:relative;font-family:system-ui,-apple-system,sans-serif;"
-      onclick="event.stopPropagation()">
-      <button data-action="close" style="position:absolute;top:8px;right:8px;background:#f1f5f9;border:none;cursor:pointer;width:22px;height:22px;border-radius:50%;font-size:14px;color:#64748b;display:flex;align-items:center;justify-content:center;">×</button>
-      <div style="margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;flex-wrap:wrap;">
-          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${bgType};color:${colorType};">${prop.type}</span>
-          <span style="font-size:11px;color:#64748b;">${prop.zone||''}</span>
-          ${prop.isCompleted ? '<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:20px;background:#f1f5f9;color:#64748b;">완료</span>' : ''}
-        </div>
-        ${tags ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px;">${tags}</div>` : ''}
-        <p style="font-weight:700;font-size:14px;margin:0 0 2px;color:#0f172a;">${prop.statusOrName||'(업체 정보 없음)'}</p>
-        <p style="font-size:11px;color:#94a3b8;margin:0;">${prop.address||'주소 미확인'}${prop.buildingName?' · '+prop.buildingName:''}</p>
-        ${prop.approxLocation ? `<p style="font-size:11px;color:#d97706;margin:2px 0 0;">📍 대략적 위치</p>` : ''}
-        <p style="font-size:11px;color:#94a3b8;margin:2px 0 0;">${floorStr} · 전용 ${areaStr}</p>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;background:#f8fafc;border-radius:8px;padding:8px;margin-bottom:8px;">
-        <div style="text-align:center;"><p style="font-size:10px;color:#94a3b8;margin:0 0 1px;">보증금</p><p style="font-weight:800;font-size:13px;color:#0f172a;margin:0;">${fmtM(prop.deposit)}</p></div>
-        <div style="text-align:center;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;"><p style="font-size:10px;color:#94a3b8;margin:0 0 1px;">월세</p><p style="font-weight:800;font-size:13px;color:#dc2626;margin:0;">${fmtM(prop.rent)}</p></div>
-        <div style="text-align:center;"><p style="font-size:10px;color:#94a3b8;margin:0 0 1px;">권리금</p><p style="font-weight:800;font-size:13px;color:${prop.premium>0?'#d97706':'#94a3b8'};margin:0;">${prop.premium>0?fmtM(prop.premium):'없음'}</p></div>
-      </div>
-      ${prop.maintenanceFee>0 ? `<div style="font-size:10px;color:#6b7280;text-align:right;margin-bottom:6px;">관리비 ${fmtM(prop.maintenanceFee)}/월</div>` : ''}
-      ${contactBlock}${notesBlock}${mgr}
-      <button data-action="detail" style="width:100%;padding:8px;background:#2563eb;color:white;border:none;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;margin-top:10px;font-family:system-ui,-apple-system,sans-serif;">상세 정보 보기 →</button>
-    </div>`;
 }

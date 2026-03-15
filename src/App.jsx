@@ -352,7 +352,7 @@ function App() {
             </div>
           ) : (
             <MapView
-              properties={properties}
+              properties={filteredProperties}
               selectedId={selectedProperty?.id}
               onSelectProperty={handleSelectProperty}
               onBoundsChange={handleBoundsChange}

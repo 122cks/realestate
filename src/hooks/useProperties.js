@@ -138,7 +138,7 @@ function mapRowToProperty(row, idx) {
   const buildingName = (r.buildingName || '').trim();
   // 기존 address 컬럼이 있으면 우선 사용, 없으면 시 + 동 + 번지로 구성
   const addressFromSheet = (r.address || '').trim();
-  const cityPrefix = BUCHEON_DONGS.has(dong) ? '부천시' : '인천';
+  const cityPrefix = getDongRegion(dong);
   const addressBuilt = dong && bunji ? `${cityPrefix} ${dong} ${bunji}` : dong ? `${cityPrefix} ${dong}` : '';
   const address = addressFromSheet || addressBuilt;
 
@@ -339,6 +339,8 @@ export function useProperties() {
     manager: '전체',
     areaMin: null,
     areaMax: null,
+    floorMin: null,
+    floorMax: null,
   };
 
   const [filters, setFilters] = useState(() => {
@@ -696,14 +698,25 @@ export function useProperties() {
         const r = filters.region || '전체';
         if (r === '전체') return true;
         const dong = p.dong || '';
-        if (r === '부천시') return BUCHEON_DONGS.has(dong);
-        if (r === '인천시') return !BUCHEON_DONGS.has(dong);
-        if (r === '부평구') return BUPYEONG_DONGS.has(dong);
-        if (r === '계양구') return GYEYANG_DONGS.has(dong);
-        if (r === '서구')   return SEO_DONGS.has(dong);
-        return true;
+        const sel = Array.isArray(r) ? r : [r];
+        if (sel.includes('전체')) return true;
+        return sel.some((s) => {
+          if (s === '부천시') return BUCHEON_DONGS.has(dong);
+          if (s === '인천시') return (
+            !BUCHEON_DONGS.has(dong) && !BUPYEONG_DONGS.has(dong) && !GYEYANG_DONGS.has(dong) && !SEO_DONGS.has(dong)
+          );
+          if (s === '부평구') return BUPYEONG_DONGS.has(dong);
+          if (s === '계양구') return GYEYANG_DONGS.has(dong);
+          if (s === '서구') return SEO_DONGS.has(dong);
+          return true;
+        });
       })();
-      const matchDong = !filters.dong || filters.dong === '전체' || p.dong === filters.dong;
+      const matchDong = (() => {
+        const d = filters.dong;
+        if (!d || d === '전체') return true;
+        if (Array.isArray(d)) return d.includes(p.dong);
+        return p.dong === d;
+      })();
       const matchDepositMin = !filters.depositMin || p.deposit >= Number(filters.depositMin);
       const matchDepositMax = !filters.depositMax || p.deposit <= Number(filters.depositMax);
       const matchRentMin = !filters.rentMin || p.rent >= Number(filters.rentMin);
@@ -712,11 +725,21 @@ export function useProperties() {
       const matchManager = !filters.manager || filters.manager === '전체' || p.manager === filters.manager;
       const matchAreaMin = !filters.areaMin || p.areaExclusive >= Number(filters.areaMin);
       const matchAreaMax = !filters.areaMax || p.areaExclusive <= Number(filters.areaMax);
+      const matchFloorMin = (() => {
+        if (!filters.floorMin && filters.floorMin !== 0) return true;
+        const f = parseInt(String(p.floor));
+        return Number.isFinite(f) && f >= Number(filters.floorMin);
+      })();
+      const matchFloorMax = (() => {
+        if (!filters.floorMax && filters.floorMax !== 0) return true;
+        const f = parseInt(String(p.floor));
+        return Number.isFinite(f) && f <= Number(filters.floorMax);
+      })();
 
       return (
         matchSearch && matchZone && matchRegion && matchDong &&
         matchDepositMin && matchDepositMax && matchRentMin && matchRentMax && matchPremiumMax &&
-        matchManager && matchAreaMin && matchAreaMax
+        matchManager && matchAreaMin && matchAreaMax && matchFloorMin && matchFloorMax
       );
     });
   }, [properties, filters]);
@@ -727,31 +750,37 @@ export function useProperties() {
       // region 변경 시: 이전에 선택된 dong이 새 region에 속하면 유지,
       // 그렇지 않으면 '전체'로 초기화합니다.
       if (key === 'region') {
-        const region = value || '전체';
+        const selRegions = Array.isArray(value) ? value : [value || '전체'];
         const allDongSet = new Set(properties.map((p) => p.dong).filter(Boolean));
         let filtered;
-        if (region === '전체') {
+        if (selRegions.includes('전체')) {
           filtered = Array.from(allDongSet);
-        } else if (region === '부천시') {
-          filtered = Array.from(allDongSet).filter(d => BUCHEON_DONGS.has(d));
-        } else if (region === '인천시') {
-          filtered = Array.from(allDongSet).filter(d =>
-            !BUCHEON_DONGS.has(d) && !BUPYEONG_DONGS.has(d) && !GYEYANG_DONGS.has(d) && !SEO_DONGS.has(d)
-          );
-        } else if (region === '부평구') {
-          filtered = Array.from(allDongSet).filter(d => BUPYEONG_DONGS.has(d));
-        } else if (region === '계양구') {
-          filtered = Array.from(allDongSet).filter(d => GYEYANG_DONGS.has(d));
-        } else if (region === '서구') {
-          filtered = Array.from(allDongSet).filter(d => SEO_DONGS.has(d));
         } else {
-          filtered = Array.from(allDongSet);
+          const parts = selRegions.map(region => {
+            if (region === '전체') return Array.from(allDongSet);
+            if (region === '부천시') return Array.from(allDongSet).filter(d => BUCHEON_DONGS.has(d));
+            if (region === '인천시') return Array.from(allDongSet).filter(d =>
+              !BUCHEON_DONGS.has(d) && !BUPYEONG_DONGS.has(d) && !GYEYANG_DONGS.has(d) && !SEO_DONGS.has(d)
+            );
+            if (region === '부평구') return Array.from(allDongSet).filter(d => BUPYEONG_DONGS.has(d));
+            if (region === '계양구') return Array.from(allDongSet).filter(d => GYEYANG_DONGS.has(d));
+            if (region === '서구') return Array.from(allDongSet).filter(d => SEO_DONGS.has(d));
+            return Array.from(allDongSet);
+          });
+          filtered = Array.from(new Set([].concat(...parts)));
         }
         const available = new Set(filtered);
-        if (!next.dong || next.dong === '전체' || available.has(next.dong)) {
-          // 현재 선택된 dong을 유지
+        // filters.dong이 배열일 수도 있으므로 모두 체크
+        if (Array.isArray(next.dong)) {
+          const keep = next.dong.filter(d => available.has(d));
+          if (keep.length > 0) next.dong = keep;
+          else next.dong = '전체';
         } else {
-          next.dong = '전체';
+          if (!next.dong || next.dong === '전체' || available.has(next.dong)) {
+            // 유지
+          } else {
+            next.dong = '전체';
+          }
         }
       }
       try { localStorage.setItem('re_filters_v1', JSON.stringify(next)); } catch { /* ignore */ }
@@ -778,6 +807,8 @@ export function useProperties() {
       manager: '전체',
       areaMin: null,
       areaMax: null,
+      floorMin: null,
+      floorMax: null,
     });
   }, []);
 
@@ -788,24 +819,24 @@ export function useProperties() {
 
   // 현재 선택된 region에 속하는 동(dong) 목록 (실제 데이터 기반)
   const dongs = useMemo(() => {
-    const region = filters.region || '전체';
+    const regionSel = filters.region || '전체';
+    const selRegions = Array.isArray(regionSel) ? regionSel : [regionSel];
     const allDongSet = new Set(properties.map((p) => p.dong).filter(Boolean));
     let filtered;
-    if (region === '전체') {
+    if (selRegions.includes('전체')) {
       filtered = Array.from(allDongSet);
-    } else if (region === '부천시') {
-      filtered = Array.from(allDongSet).filter(d => BUCHEON_DONGS.has(d));
-    } else if (region === '인천시') {
-      filtered = Array.from(allDongSet).filter(d =>
-        !BUCHEON_DONGS.has(d) && !BUPYEONG_DONGS.has(d) && !GYEYANG_DONGS.has(d) && !SEO_DONGS.has(d));
-    } else if (region === '부평구') {
-      filtered = Array.from(allDongSet).filter(d => BUPYEONG_DONGS.has(d));
-    } else if (region === '계양구') {
-      filtered = Array.from(allDongSet).filter(d => GYEYANG_DONGS.has(d));
-    } else if (region === '서구') {
-      filtered = Array.from(allDongSet).filter(d => SEO_DONGS.has(d));
     } else {
-      filtered = Array.from(allDongSet);
+      const parts = selRegions.map(region => {
+        if (region === '전체') return Array.from(allDongSet);
+        if (region === '부천시') return Array.from(allDongSet).filter(d => BUCHEON_DONGS.has(d));
+        if (region === '인천시') return Array.from(allDongSet).filter(d =>
+          !BUCHEON_DONGS.has(d) && !BUPYEONG_DONGS.has(d) && !GYEYANG_DONGS.has(d) && !SEO_DONGS.has(d));
+        if (region === '부평구') return Array.from(allDongSet).filter(d => BUPYEONG_DONGS.has(d));
+        if (region === '계양구') return Array.from(allDongSet).filter(d => GYEYANG_DONGS.has(d));
+        if (region === '서구') return Array.from(allDongSet).filter(d => SEO_DONGS.has(d));
+        return Array.from(allDongSet);
+      });
+      filtered = Array.from(new Set([].concat(...parts)));
     }
     return filtered.sort();
   }, [properties, filters.region]);
