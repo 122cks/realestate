@@ -28,6 +28,7 @@ function App() {
     error: _error,
     filters,
     zones,
+    dongs,
     managers,
     updateFilter,
     resetFilters,
@@ -361,8 +362,9 @@ function App() {
             onUpdate={updateFilter}
             onReset={resetFilters}
             totalCount={properties.filter(p => !p.isCompleted).length}
-            filteredCount={filteredProperties.length}
+            filteredCount={viewportProps.filter(p => !p.isCompleted).length}
             zones={zones}
+            dongs={dongs}
             managers={managers}
             onExportCSV={handleExportCSV}
           />
@@ -414,8 +416,9 @@ function App() {
           onUpdate={updateFilter}
           onReset={resetFilters}
           totalCount={properties.filter(p => !p.isCompleted).length}
-          filteredCount={filteredProperties.length}
+          filteredCount={filteredProperties.filter(p => !p.isCompleted).length}
           zones={zones}
+          dongs={dongs}
           managers={managers}
           onExportCSV={handleExportCSV}
         />

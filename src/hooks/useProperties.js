@@ -302,6 +302,7 @@ export function useProperties() {
     searchTerm: '',
     zone: '전체',
     region: '전체',
+    dong: '전체',
     categories: ['임대','매매','공실'],
     isVacantOnly: false,
     type: '전체',
@@ -677,6 +678,7 @@ export function useProperties() {
         if (r === '서구')   return SEO_DONGS.has(dong);
         return true;
       })();
+      const matchDong = !filters.dong || filters.dong === '전체' || p.dong === filters.dong;
       const matchDepositMin = !filters.depositMin || p.deposit >= Number(filters.depositMin);
       const matchDepositMax = !filters.depositMax || p.deposit <= Number(filters.depositMax);
       const matchRentMin = !filters.rentMin || p.rent >= Number(filters.rentMin);
@@ -687,7 +689,7 @@ export function useProperties() {
       const matchAreaMax = !filters.areaMax || p.areaExclusive <= Number(filters.areaMax);
 
       return (
-        matchSearch && matchZone && matchRegion &&
+        matchSearch && matchZone && matchRegion && matchDong &&
         matchDepositMin && matchDepositMax && matchRentMin && matchRentMax && matchPremiumMax &&
         matchManager && matchAreaMin && matchAreaMax
       );
@@ -696,7 +698,9 @@ export function useProperties() {
 
   const updateFilter = useCallback((key, value) => {
     setFilters((prev) => {
-      const next = { ...prev, [key]: value };
+      let next = { ...prev, [key]: value };
+      // 지역(region) 변경 시 동(dong) 필터 초기화
+      if (key === 'region') next = { ...next, dong: '전체' };
       try { localStorage.setItem('re_filters_v1', JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
@@ -708,6 +712,7 @@ export function useProperties() {
       searchTerm: '',
       zone: '전체',
       region: '전체',
+      dong: '전체',
       categories: ['임대', '매매', '공실'],
       isVacantOnly: false,
       type: '전체',
@@ -728,6 +733,30 @@ export function useProperties() {
     return ['전체', ...Array.from(set).sort()];
   }, [properties]);
 
+  // 현재 선택된 region에 속하는 동(dong) 목록 (실제 데이터 기반)
+  const dongs = useMemo(() => {
+    const region = filters.region || '전체';
+    const allDongSet = new Set(properties.map((p) => p.dong).filter(Boolean));
+    let filtered;
+    if (region === '전체') {
+      filtered = Array.from(allDongSet);
+    } else if (region === '부천시') {
+      filtered = Array.from(allDongSet).filter(d => BUCHEON_DONGS.has(d));
+    } else if (region === '인천시') {
+      filtered = Array.from(allDongSet).filter(d =>
+        !BUCHEON_DONGS.has(d) && !BUPYEONG_DONGS.has(d) && !GYEYANG_DONGS.has(d) && !SEO_DONGS.has(d));
+    } else if (region === '부평구') {
+      filtered = Array.from(allDongSet).filter(d => BUPYEONG_DONGS.has(d));
+    } else if (region === '계양구') {
+      filtered = Array.from(allDongSet).filter(d => GYEYANG_DONGS.has(d));
+    } else if (region === '서구') {
+      filtered = Array.from(allDongSet).filter(d => SEO_DONGS.has(d));
+    } else {
+      filtered = Array.from(allDongSet);
+    }
+    return filtered.sort();
+  }, [properties, filters.region]);
+
   const managers = useMemo(() => {
     const set = new Set(properties.map((p) => p.manager).filter(Boolean));
     return Array.from(set).sort();
@@ -740,6 +769,7 @@ export function useProperties() {
     error,
     filters,
     zones,
+    dongs,
     managers,
     updateFilter,
     resetFilters,

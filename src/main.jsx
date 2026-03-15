@@ -20,7 +20,8 @@ if (kakaoKey) {
     }
   };
   s.onerror = () => {
-    console.error('[Kakao] SDK 로드 실패. 앱키(07dde0a65db5d58e176078857365166b)와 허용 도메인(localhost)을 카카오 개발자 콘솔에서 확인하세요.');
+    const domain = window.location.hostname;
+    console.error(`[Kakao] SDK 로드 실패. 현재 도메인(${domain})이 카카오 개발자 콘솔 → 플랫폼(웹) → JavaScript SDK 도메인에 등록되어 있는지 확인하세요.`);
     window.kakaoSdkError = true;
     window.dispatchEvent(new Event('kakao-sdk-error'));
   };
