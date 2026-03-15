@@ -25,7 +25,7 @@ export default function RoutePanel({
         <div className="flex items-center gap-2">
           <Navigation size={16} />
           <span className="font-bold text-sm">경로 최적화</span>
-          <span className="text-indigo-200 text-xs">({routeSelection.length}/5개 선택)</span>
+          <span className="text-indigo-200 text-xs">({routeSelection.length}개 선택)</span>
         </div>
         <div className="flex items-center gap-2">
           {routeSelection.length > 0 && (
@@ -46,7 +46,7 @@ export default function RoutePanel({
         {routeSelection.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-slate-400 gap-2">
             <MapPin size={28} className="opacity-40" />
-            <p className="text-sm font-medium">매물을 2~5개 선택해 경로를 계산하세요</p>
+            <p className="text-sm font-medium">매물을 2개 이상 선택해 경로를 계산하세요</p>
             <p className="text-xs text-center px-6">목록에서 <span className="text-indigo-500 font-semibold">경로 추가(+)</span> 버튼을 클릭하거나<br />지도에서 매물 마커를 클릭하세요</p>
           </div>
         ) : (

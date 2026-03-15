@@ -3,6 +3,11 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [ main ]
+  schedule:
+    # 매일 자정 KST (UTC 15:00) — 구글 시트 최신 데이터 자동 반영
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+    # GitHub Actions 탭에서 수동 배포 트리거 가능
 
 jobs:
   build:
@@ -17,8 +22,16 @@ jobs:
           node-version: '18'
       - name: Install dependencies
         run: npm ci
+      - name: Fetch Google Sheet data (pre-bake)
+        run: node scripts/fetch-sheet.cjs
+        env:
+          VITE_SPREADSHEET_ID: ${{ secrets.VITE_SPREADSHEET_ID }}
+          VITE_SHEET_GID: ${{ secrets.VITE_SHEET_GID }}
+        continue-on-error: true   # 시트 연결 실패해도 빌드 계속
       - name: Build
         run: npm run build
+        env:
+          VITE_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:

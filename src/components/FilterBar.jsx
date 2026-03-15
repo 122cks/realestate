@@ -1,12 +1,63 @@
-import React, { useState } from 'react';
-import { Search, SlidersHorizontal, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { Search, SlidersHorizontal, RotateCcw, ChevronDown, ChevronUp, Download } from 'lucide-react';
 
-export default function FilterBar({ filters, onUpdate, onReset, totalCount, filteredCount, zones }) {
+export default function FilterBar({ filters, onUpdate, onReset, totalCount, filteredCount, zones, managers, onExportCSV }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  // 검색어 디바운스: 로컨 타이핑 중 직접 상태 변경 없이 250ms 후 반영
+  const [localSearch, setLocalSearch] = useState(filters.searchTerm || '');
+  const debounceRef = useRef(null);
+
+  // 외부(예: 초기화) 에서 filters.searchTerm 변경 시 동기화
+  useEffect(() => { setLocalSearch(filters.searchTerm || ''); }, [filters.searchTerm]);
+
+  const handleSearchChange = useCallback((e) => {
+    const val = e.target.value;
+    setLocalSearch(val);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => onUpdate('searchTerm', val), 250);
+  }, [onUpdate]);
 
   const zoneOptions = zones && zones.length > 0
     ? ['전체', ...zones.filter(z => z !== '전체')]
     : ['전체'];
+
+  const managerOptions = managers && managers.length > 0
+    ? ['전체', ...managers.filter(m => m && m !== '전체').sort()]
+    : ['전체'];
+
+  // 파생 카테고리(레거시 필터 호환): filters.categories가 있으면 우선 사용,
+  // 없으면 기존 filters.type / isVacantOnly / showCompleted로 유추
+  const derivedCategories = useMemo(() => {
+    if (Array.isArray(filters.categories) && filters.categories.length > 0) return filters.categories;
+    const set = new Set();
+    if (filters.isVacantOnly) {
+      set.add('공실');
+    } else {
+      if (!filters.type || filters.type === '전체') {
+        set.add('임대'); set.add('매매'); set.add('공실');
+      } else {
+        set.add(filters.type);
+        set.add('공실');
+      }
+    }
+    if (filters.showCompleted) set.add('완료');
+    return Array.from(set);
+  }, [filters]);
+
+  const handleToggleCategory = useCallback((cat) => {
+    const cur = new Set(derivedCategories);
+    if (cur.has(cat)) cur.delete(cat); else cur.add(cat);
+    const next = Array.from(cur);
+    onUpdate('categories', next);
+    // 레거시 필터 동기화: type / isVacantOnly / showCompleted
+    const hasRent = next.includes('임대');
+    const hasSale = next.includes('매매');
+    const onlyVacant = next.length === 1 && next[0] === '공실';
+    const nextType = (hasRent && !hasSale) ? '임대' : (!hasRent && hasSale) ? '매매' : '전체';
+    onUpdate('type', nextType);
+    onUpdate('isVacantOnly', onlyVacant);
+    onUpdate('showCompleted', next.includes('완료'));
+  }, [derivedCategories, onUpdate]);
 
   return (
     <div className="bg-white border-b border-slate-200 shadow-sm">
@@ -19,8 +70,8 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
             type="text"
             placeholder="구역, 상호명, 주소, 건물명 검색..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-            value={filters.searchTerm}
-            onChange={(e) => onUpdate('searchTerm', e.target.value)}
+            value={localSearch}
+            onChange={handleSearchChange}
           />
         </div>
 
@@ -35,16 +86,20 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
           ))}
         </select>
 
-        {/* 유형 드롭다운 */}
-        <select
-          className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition"
-          value={filters.type}
-          onChange={(e) => onUpdate('type', e.target.value)}
-        >
-          {['전체', '임대', '매매'].map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
+        {/* 담당자 드롭다운 */}
+        {managerOptions.length > 1 && (
+          <select
+            className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition"
+            value={filters.manager || '\uc804체'}
+            onChange={(e) => onUpdate('manager', e.target.value)}
+          >
+            {managerOptions.map((m) => (
+              <option key={m} value={m}>{m === '\uc804체' ? '\ub2f4당 \uc804체' : `\ub2f4당: ${m}`}</option>
+            ))}
+          </select>
+        )}
+
+        {/* (유형 드롭다운 제거 — 하단 버튼 그룹으로 대체) */}
 
         {/* 상세 필터 토글 */}
         <button
@@ -68,25 +123,42 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
         >
           <RotateCcw size={15} />
         </button>
+
+        {/* CSV 내보내기 */}
+        {onExportCSV && (
+          <button
+            onClick={onExportCSV}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 transition font-medium"
+            title="필터된 목록 CSV 내보내기"
+          >
+            <Download size={15} />
+            CSV
+          </button>
+        )}
       </div>
 
       {/* 빠른 필터 토글 행 */}
       <div className="px-4 pb-2 flex items-center justify-between">
-        <div className="flex items-center gap-4 flex-wrap">
-          {/* 공실만 보기 */}
-          <ToggleSwitch
-            checked={filters.isVacantOnly}
-            onChange={(v) => onUpdate('isVacantOnly', v)}
-            label="공실만 보기"
-            activeColor="bg-green-500"
-          />
-          {/* 완료 매물 포함 */}
-          <ToggleSwitch
-            checked={!!filters.showCompleted}
-            onChange={(v) => onUpdate('showCompleted', v)}
-            label="완료 포함"
-            activeColor="bg-slate-500"
-          />
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* 카테고리 버튼 그룹 */}
+          {['임대','매매','공실','완료'].map((cat) => {
+            const active = derivedCategories.includes(cat);
+            const base = active ? 'text-white font-semibold' : 'text-slate-600';
+            const bg = active
+              ? (cat === '임대' ? 'bg-blue-600' : cat === '매매' ? 'bg-rose-600' : cat === '공실' ? 'bg-green-500' : 'bg-slate-500')
+              : 'bg-white border border-slate-200';
+            return (
+              <button
+                key={cat}
+                onClick={() => handleToggleCategory(cat)}
+                className={`${bg} ${base} px-3 py-1.5 rounded-full text-sm transition`}
+                aria-pressed={active}
+                title={`토글 ${cat}`}
+              >
+                {cat}
+              </button>
+            );
+          })}
         </div>
 
         {/* 검색 결과 카운트 */}
@@ -161,6 +233,30 @@ export default function FilterBar({ filters, onUpdate, onReset, totalCount, filt
                 onChange={(e) => onUpdate('premiumMax', e.target.value)}
               />
               <p className="text-xs text-slate-400 mt-1">0 입력 시 권리금 없는 매물만</p>
+            </div>
+
+            {/* 면적 범위 */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+                전용면적 (㎡)
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  placeholder="최소"
+                  className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  value={filters.areaMin || ''}
+                  onChange={(e) => onUpdate('areaMin', e.target.value)}
+                />
+                <span className="text-slate-400 text-xs">∼</span>
+                <input
+                  type="number"
+                  placeholder="최대"
+                  className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  value={filters.areaMax || ''}
+                  onChange={(e) => onUpdate('areaMax', e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import MapView from './components/MapView';
 import FilterBar from './components/FilterBar';
 import PropertyList from './components/PropertyList';
@@ -6,7 +6,10 @@ import PropertyDrawer from './components/PropertyDrawer';
 import RoutePanel from './components/RoutePanel';
 import PropertyEditModal from './components/PropertyEditModal';
 import { useProperties } from './hooks/useProperties';
-import { Building2, RefreshCw, Route, X } from 'lucide-react';
+import { Building2, RefreshCw, Route, X, BarChart2 } from 'lucide-react';
+
+// 통계 패널은 사용할 때만 로드 (Recharts가 크므로 코드 분할)
+const StatsPanel = lazy(() => import('./components/StatsPanel'));
 
 function StatBadge({ label, value, color }) {
   return (
@@ -25,6 +28,7 @@ function App() {
     error,
     filters,
     zones,
+    managers,
     updateFilter,
     resetFilters,
     connectGoogle,
@@ -46,6 +50,40 @@ function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [routeMode, setRouteMode] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
+  const [isStatsPanelOpen, setIsStatsPanelOpen] = useState(false);
+
+  // Esc 키로 drawer/modal 닫기
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setIsDrawerOpen(false);
+        setEditingProperty(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // CSV 내보내기
+  const handleExportCSV = useCallback(() => {
+    const headers = ['순번', '구역', '상호명', '주소', '건물명', '층', '호', '전용면적', '보증금', '월세', '권리금', '관리비', '공실', '임대인', '임차인연락처', '담당', '비고'];
+    const rows = filteredProperties.map(p => [
+      p.id, p.zone, p.statusOrName, p.address, p.buildingName,
+      p.floor, p.unit, p.areaExclusive, p.deposit, p.rent,
+      p.premium, p.maintenanceFee, p.isVacant ? '공실' : '',
+      p.contactOwner, p.contactTenant, p.manager, p.notes,
+    ]);
+    const csv = [headers, ...rows]
+      .map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `매물목록_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [filteredProperties]);
 
   const handleSelectProperty = useCallback((prop) => {
     setSelectedProperty(prop);
@@ -97,6 +135,16 @@ function App() {
             <StatBadge label="매매" value={properties.filter((p) => p.type === '매매' && !p.isCompleted).length} color="text-rose-400" />
           </div>
 
+          {/* 통계 대시보드 버튼 */}
+          <button
+            onClick={() => setIsStatsPanelOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition border bg-white/10 border-white/20 text-white hover:bg-white/20"
+            title="통계 대시보드"
+          >
+            <BarChart2 size={15} />
+            통계
+          </button>
+
           {/* 경로 최적화 모드 토글 */}
           <button
             onClick={handleToggleRouteMode}
@@ -115,11 +163,19 @@ function App() {
             )}
           </button>
 
-          {/* 지오코딩 진행 표시 */}
+          {/* 지오코딩 진행 표시 (bar + 텍스트) */}
           {geocoding.running && (
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/20">
-              <RefreshCw size={12} className="animate-spin" />
-              좌표 변환 {geocoding.done}/{geocoding.total}
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/20 min-w-[130px]">
+              <RefreshCw size={12} className="animate-spin flex-shrink-0" />
+              <div className="flex-1">
+                <div className="mb-0.5">좌표 변환 {geocoding.done}/{geocoding.total}</div>
+                <div className="w-full bg-amber-900/40 rounded-full h-1">
+                  <div
+                    className="bg-amber-400 h-1 rounded-full transition-all duration-300"
+                    style={{ width: `${geocoding.total > 0 ? Math.round((geocoding.done / geocoding.total) * 100) : 0}%` }}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -156,7 +212,7 @@ function App() {
           <span className="flex items-center gap-2">
             <Route size={15} />
             <strong>경로 최적화 모드</strong>
-            <span className="text-purple-200">— 지도 또는 목록에서 최대 5개 물건을 선택하세요</span>
+            <span className="text-purple-200">— 지도 또는 목록에서 매물을 선택하세요</span>
           </span>
           <button
             onClick={handleToggleRouteMode}
@@ -181,7 +237,7 @@ function App() {
             </div>
           ) : (
             <MapView
-              properties={filteredProperties}
+              properties={properties}
               selectedId={selectedProperty?.id}
               onSelectProperty={handleSelectProperty}
               routeOrder={routeResult?.route}
@@ -196,9 +252,10 @@ function App() {
             <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg px-3 py-2 text-xs border border-slate-200 z-10">
               <p className="font-semibold text-slate-600 mb-1.5">범례</p>
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1.5"><div className="w-4 h-4 bg-blue-600 rounded-sm" /><span className="text-slate-600">임대</span></div>
-                <div className="flex items-center gap-1.5"><div className="w-4 h-4 bg-rose-600 rounded-sm" /><span className="text-slate-600">매매</span></div>
-                <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-green-400 rounded-full border border-green-600" /><span className="text-slate-600">공실</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-blue-600 rounded-full" /><span className="text-slate-600">임대</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-rose-600 rounded-full" /><span className="text-slate-600">매매</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-green-500 rounded-full" /><span className="text-slate-600">공실</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-slate-500 rounded-full" /><span className="text-slate-600">완료</span></div>
                 {routeMode && <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-purple-500 rounded-full" /><span className="text-slate-600">경로 선택</span></div>}
               </div>
             </div>
@@ -228,6 +285,8 @@ function App() {
             totalCount={properties.filter(p => !p.isCompleted).length}
             filteredCount={filteredProperties.length}
             zones={zones}
+            managers={managers}
+            onExportCSV={handleExportCSV}
           />
           <div className="flex-1 overflow-hidden flex flex-col">
             <PropertyList
@@ -251,6 +310,16 @@ function App() {
           onComplete={completeProperty}
           onUncomplete={uncompleteProperty}
         />
+      )}
+
+      {/* 통계 패널 */}
+      {isStatsPanelOpen && (
+        <Suspense fallback={<div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center"><div className="bg-white rounded-xl px-6 py-4 text-sm text-slate-600">통계 로딩 중...</div></div>}>
+          <StatsPanel
+            properties={properties}
+            onClose={() => setIsStatsPanelOpen(false)}
+          />
+        </Suspense>
       )}
 
       {/* 수정 모달 */}

@@ -27,6 +27,8 @@ function sortProperties(list, sortKey) {
   });
 }
 
+const PAGE_SIZE = 20;
+
 export default function PropertyList({
   properties,
   selectedId,
@@ -36,8 +38,11 @@ export default function PropertyList({
   onToggleRoute,
 }) {
   const [sortKey, setSortKey] = useState('default');
+  const [showCount, setShowCount] = useState(PAGE_SIZE);
 
   const sorted = sortProperties(properties, sortKey);
+  const visible = sorted.slice(0, showCount);
+  const hasMore = sorted.length > showCount;
 
   if (properties.length === 0) {
     return (
@@ -56,7 +61,7 @@ export default function PropertyList({
         <div className="px-4 py-2 bg-purple-50 border-b border-purple-200 flex items-center gap-2 text-purple-700">
           <Route size={15} className="flex-shrink-0" />
           <span className="text-xs font-semibold">
-            경로 모드 — + 버튼으로 최대 5개 물건 선택 ({routeSelection.length}/5)
+            경로 모드 — + 버튼으로 물건 선택 ({routeSelection.length}개 선택 중)
           </span>
         </div>
       )}
@@ -69,7 +74,7 @@ export default function PropertyList({
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.key}
-              onClick={() => setSortKey(opt.key)}
+              onClick={() => { setSortKey(opt.key); setShowCount(PAGE_SIZE); }}
               className={`px-2.5 py-1 text-xs rounded-full border transition
                 ${sortKey === opt.key
                   ? 'bg-blue-600 text-white border-blue-600 font-semibold'
@@ -96,7 +101,7 @@ export default function PropertyList({
 
       {/* 매물 목록 */}
       <div className="flex-1 overflow-y-auto">
-        {sorted.map((prop) => {
+        {visible.map((prop) => {
           const routeIdx = routeSelection.indexOf(prop.id);
           const isRouteSelected = routeIdx !== -1;
           return (
@@ -112,6 +117,17 @@ export default function PropertyList({
             />
           );
         })}
+        {/* 더 보기 버튼 */}
+        {hasMore && (
+          <div className="py-3 text-center border-t border-slate-100">
+            <button
+              onClick={() => setShowCount(n => n + PAGE_SIZE)}
+              className="px-4 py-2 text-sm text-blue-600 font-semibold border border-blue-200 rounded-lg hover:bg-blue-50 transition"
+            >
+              +{Math.min(PAGE_SIZE, sorted.length - showCount)}개 더 보기 ({showCount} / {sorted.length})
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -90,8 +90,8 @@ export function optimizeRoute(points) {
 
   // Nearest Neighbor로 초기 경로
   const nn = nearestNeighbor(valid);
-  // 2-opt 개선 (소규모에서만)
-  const optimized = valid.length <= 10 ? twoOpt(nn) : nn;
+  // 2-opt 개선 (20개 이하에서)
+  const optimized = valid.length <= 20 ? twoOpt(nn) : nn;
 
   return {
     route: optimized,
